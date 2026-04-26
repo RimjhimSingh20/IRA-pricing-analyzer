@@ -77,15 +77,25 @@ function getDiscountTier(drugType, years) {
   }
 }
 
-function getScenarios(wac, discountTier) {
+// Calibrated to 2024 CMS negotiated prices (avg 64% discount off list price).
+// Small molecules achieve higher discounts than biologics based on observed CMS behavior.
+function getScenarios(wac, discountTier, drugType) {
   if (!discountTier) return null;
-  // Floor = statutory ceiling discount, Base = +7%, Aggressive = +12% beyond ceiling
-  const basePct  = Math.min(discountTier.pct + 7, 75);
-  const aggrPct  = Math.min(discountTier.pct + 15, 80);
+  const isSmallMol = drugType === 'small-molecule';
+
+  // Base case: midpoint of observed 2024 CMS range (SM 60–65%, Bio 50–55%)
+  const baseTarget = isSmallMol ? 63 : 52;
+  // Aggressive: worst-case manufacturer scenario (SM 70–75%, Bio 65–70%)
+  const aggrTarget = isSmallMol ? 73 : 68;
+
+  // Never fall below the statutory floor
+  const basePct = Math.max(discountTier.pct, baseTarget);
+  const aggrPct = Math.max(discountTier.pct, aggrTarget);
+
   return [
-    { label:'Statutory Ceiling', pct: discountTier.pct,  mfp: wac*(1-discountTier.pct/100), color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
-    { label:'Analyst Base Case', pct: basePct,            mfp: wac*(1-basePct/100),           color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
-    { label:'CMS Aggressive',    pct: aggrPct,            mfp: wac*(1-aggrPct/100),            color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
+    { label:'Statutory Ceiling', sublabel:'IRA minimum discount', pct: discountTier.pct, mfp: wac*(1-discountTier.pct/100), color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
+    { label:'Analyst Base Case', sublabel: isSmallMol ? 'SM: 60–65% range' : 'Bio: 50–55% range', pct: basePct, mfp: wac*(1-basePct/100), color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
+    { label:'CMS Aggressive',    sublabel: isSmallMol ? 'SM: 70–75% range' : 'Bio: 65–70% range', pct: aggrPct, mfp: wac*(1-aggrPct/100), color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
   ];
 }
 
@@ -278,7 +288,7 @@ function App() {
     const wac   = parseFloat(form.wac);
     const units = parseFloat(form.annualUnits);
     const discountTier  = getDiscountTier(form.drugType, form.yearsSinceApproval);
-    const scenarios     = discountTier ? getScenarios(wac, discountTier) : null;
+    const scenarios     = discountTier ? getScenarios(wac, discountTier, form.drugType) : null;
     const baseMFP       = scenarios ? scenarios[1].mfp : wac;
     const projection    = buildProjection(wac * units, baseMFP, wac, units);
     const currentRev    = wac * units;
@@ -470,17 +480,29 @@ function App() {
 
                 {/* Scenario comparison */}
                 <div style={{ marginTop:6 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>Scenario Comparison</div>
+                  <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em' }}>Scenario Comparison</div>
+                    <div style={{ fontSize:11, color:'#64748b', display:'flex', alignItems:'center', gap:5 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Calibrated to 2024 CMS negotiated prices (avg 64% discount) ·{' '}
+                      <strong style={{ color: form.drugType==='small-molecule' ? '#d97706' : '#0891b2' }}>
+                        {form.drugType==='small-molecule' ? 'Small molecule ranges applied' : 'Biologic ranges applied'}
+                      </strong>
+                    </div>
+                  </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
                     {report.scenarios.map((s,i) => {
                       const annualRev = s.mfp * report.units;
                       const annualDelta = annualRev - report.currentRev;
                       return (
                         <div key={i} style={{ borderRadius:10, padding:16, background:s.bg, border:`1px solid ${s.border}` }}>
-                          <div style={{ fontSize:11, fontWeight:700, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>{s.label}</div>
-                          <div style={{ marginBottom:6 }}>
+                          <div style={{ marginBottom:8 }}>
+                            <div style={{ fontSize:11, fontWeight:700, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{s.label}</div>
+                            <div style={{ fontSize:10, color:s.color, opacity:0.75, marginTop:1 }}>{s.sublabel}</div>
+                          </div>
+                          <div style={{ marginBottom:8 }}>
                             <div style={{ fontSize:10, color:'#9ca3af' }}>Discount from WAC</div>
-                            <div style={{ fontSize:18, fontWeight:800, color:s.color }}>{s.pct}%</div>
+                            <div style={{ fontSize:22, fontWeight:800, color:s.color, lineHeight:1.1 }}>{s.pct}%</div>
                           </div>
                           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                             <div>
@@ -499,6 +521,9 @@ function App() {
                         </div>
                       );
                     })}
+                  </div>
+                  <div style={{ marginTop:10, fontSize:11, color:'#94a3b8', fontStyle:'italic' }}>
+                    Source: CMS Medicare Drug Price Negotiation Program — Initial Negotiated Prices for 2026 (August 2024). Statutory ceiling represents the IRA § 1192 MFP ceiling; base and aggressive scenarios reflect observed CMS negotiating behavior.
                   </div>
                 </div>
               </SectionCard>
