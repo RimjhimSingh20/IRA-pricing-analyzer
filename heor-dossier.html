@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HEOR Value Dossier Generator — MarketAccess.ai</title>
+  <meta name="description" content="Generate structured AMCP-format health economic and outcomes research dossiers for payer negotiations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .fade-up { animation: fadeUp 0.4s ease-out forwards; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .bar-fill { transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+    .check-item { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid #f3f4f6; }
+    .check-item:last-child { border-bottom:none; }
+    @media print {
+      * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+      @page { margin:0.45in; size:letter portrait; }
+      body { background:white!important; }
+      .no-print { display:none!important; }
+    }
+  </style>
+</head>
+<body style="background:#f8fafc;min-height:100vh;margin:0;">
+
+<!-- Suite Nav -->
+<nav style="background:#070f22;padding:9px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1e3a6e;font-family:Inter,system-ui;position:sticky;top:0;z-index:50;" class="no-print">
+  <a href="index.html" style="display:flex;align-items:center;gap:9px;text-decoration:none;">
+    <div style="width:28px;height:28px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <div style="line-height:1;">
+      <span style="color:white;font-weight:800;font-size:14px;">MarketAccess.ai</span>
+      <span style="color:#60a5fa;font-size:10px;margin-left:7px;text-transform:uppercase;letter-spacing:0.06em;">IRA Strategy Suite</span>
+    </div>
+  </a>
+  <div style="display:flex;gap:24px;align-items:center;">
+    <a href="index.html"         style="color:#93c5fd;font-size:12px;font-weight:500;text-decoration:none;">Home</a>
+    <a href="analyzer.html"      style="color:#93c5fd;font-size:12px;font-weight:500;text-decoration:none;">Risk Analyzer</a>
+    <a href="cms-simulator.html" style="color:#93c5fd;font-size:12px;font-weight:500;text-decoration:none;">CMS Simulator</a>
+    <a href="heor-dossier.html"  style="color:white;font-size:12px;font-weight:600;text-decoration:none;border-bottom:2px solid #7c3aed;padding-bottom:1px;">HEOR Dossier</a>
+  </div>
+</nav>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useRef } = React;
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+const THERAPEUTIC_AREAS  = ['Oncology','Cardiology','Rare Disease','Diabetes','Neurology','Other'];
+const MECHANISM_CLASSES  = ['First-in-class','Best-in-class','Me-too / Follow-on','New formulation / delivery','Biosimilar'];
+const TRIAL_PHASES       = ['Phase 2','Phase 3','Phase 3b / Real-world'];
+const ENDPOINTS          = ['Overall Survival (OS)','Progression-Free Survival (PFS)','Event-Free Survival (EFS)','Cardiovascular Composite (MACE)','HbA1c Reduction','Clinical Response Rate','Patient-Reported Outcome (PRO)','Biomarker / Surrogate'];
+const BENEFIT_OPTIONS    = ['Statistically superior','Non-inferior','Numerically superior (NS)','Head-to-head ongoing'];
+const ICER_RANGES        = ['<$50K','$50K–$100K','$100K–$150K','$150K–$200K','>$200K','Not yet modeled'];
+const DESIGNATIONS_LIST  = ['Breakthrough Therapy','Priority Review','Fast Track','Orphan Drug','Accelerated Approval'];
+const PAYER_SEGMENTS     = ['Medicare Part D','Medicaid','Commercial / PBM','VA / DoD','Employer / Self-insured'];
+
+const INITIAL = {
+  drugName:'', therapeuticArea:'', drugType:'small-molecule', indication:'',
+  mechanismClass:'', designations:[],
+  trialName:'', trialPhase:'Phase 3', primaryEndpoint:'', benefit:'', safety:'Similar', comparator:'',
+  icer:'', rwe:'None', registry:'no', payerSegments:[],
+};
+
+// ─── SCORING ─────────────────────────────────────────────────────────────────
+
+function calcReadiness(d) {
+  const factors = [];
+  let total = 0;
+
+  // 1. Trial evidence quality (0–20)
+  const trialPts = d.trialPhase === 'Phase 2' ? 10 : 20;
+  total += trialPts;
+  factors.push({ label:'Clinical Trial Evidence', pts:trialPts, max:20, note:`${d.trialPhase} pivotal data` });
+
+  // 2. Comparative benefit (0–15)
+  const benefitPts = { 'Statistically superior':15, 'Non-inferior':8, 'Numerically superior (NS)':5, 'Head-to-head ongoing':2 }[d.benefit] ?? 0;
+  total += benefitPts;
+  factors.push({ label:'Comparative Clinical Benefit', pts:benefitPts, max:15, note: d.benefit || 'Not specified' });
+
+  // 3. Cost-effectiveness position (0–25)
+  const icerPts = { '<$50K':25, '$50K–$100K':22, '$100K–$150K':15, '$150K–$200K':8, '>$200K':3, 'Not yet modeled':0 }[d.icer] ?? 0;
+  total += icerPts;
+  factors.push({ label:'Cost-Effectiveness Position', pts:icerPts, max:25, note: d.icer === 'Not yet modeled' ? 'ICER modeling not completed' : `ICER ${d.icer} / QALY` });
+
+  // 4. Real-world evidence (0–20)
+  const rwePts = { 'Published':20, 'In Development':10, 'None':0 }[d.rwe] ?? 0;
+  total += rwePts;
+  factors.push({ label:'Real-World Evidence', pts:rwePts, max:20, note:`RWE status: ${d.rwe}` });
+
+  // 5. Patient registry (0–10)
+  const regPts = d.registry === 'yes' ? 10 : 0;
+  total += regPts;
+  factors.push({ label:'Patient Registry Infrastructure', pts:regPts, max:10, note: d.registry === 'yes' ? 'Active patient registry' : 'No registry established' });
+
+  // 6. Regulatory designations (0–10)
+  const desigMap = { 'Breakthrough Therapy':5, 'Priority Review':3, 'Fast Track':2, 'Orphan Drug':3, 'Accelerated Approval':3 };
+  const desigPts = Math.min(10, (d.designations||[]).reduce((a,x) => a + (desigMap[x]||0), 0));
+  total += desigPts;
+  factors.push({ label:'Regulatory Designations', pts:desigPts, max:10, note: d.designations?.length ? d.designations.join(', ') : 'No special designations' });
+
+  return { total: Math.max(0, Math.min(100, Math.round(total))), factors };
+}
+
+function getReadinessLevel(s) {
+  if (s >= 70) return { label:'Submission Ready',  hex:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' };
+  if (s >= 40) return { label:'Developing',        hex:'#d97706', bg:'#fffbeb', border:'#fde68a' };
+  return             { label:'Early Stage',         hex:'#dc2626', bg:'#fef2f2', border:'#fecaca' };
+}
+
+function getEvidenceLevel(d) {
+  const isOSorCV = ['Overall Survival (OS)','Cardiovascular Composite (MACE)'].includes(d.primaryEndpoint);
+  if (d.trialPhase !== 'Phase 2' && d.benefit === 'Statistically superior' && isOSorCV) return { level:'Level I', color:'#16a34a', desc:'Randomized controlled trial with hard clinical endpoint demonstrating superiority — highest evidentiary standard' };
+  if (d.trialPhase !== 'Phase 2' && (d.benefit === 'Statistically superior' || d.benefit === 'Non-inferior')) return { level:'Level II', color:'#d97706', desc:'Phase 3 RCT data with surrogate or composite endpoint. Accepted by most payers with appropriate clinical contextualization' };
+  return { level:'Level III', color:'#dc2626', desc:'Phase 2 or non-definitive comparative data. Will require supplementary evidence package and real-world data bridge strategy' };
+}
+
+// ─── CONTENT GENERATION ───────────────────────────────────────────────────────
+
+function genEvidenceGaps(d) {
+  const gaps = [];
+  if (d.rwe === 'None')                                gaps.push({ priority:'Critical',  gap:'Real-world effectiveness data absent', action:'Initiate retrospective claims-based study or registry-linked outcomes analysis within 6 months' });
+  if (d.registry === 'no')                             gaps.push({ priority:'High',     gap:'Patient registry infrastructure not established', action:'Design and launch disease registry with 24-month enrollment target; prioritize rare disease or specialty indications' });
+  if (d.icer === 'Not yet modeled')                    gaps.push({ priority:'Critical',  gap:'Cost-effectiveness model not developed', action:'Commission ICER-format cost-utility analysis; ensure alignment with ISPOR good practice guidelines' });
+  if (d.benefit === 'Non-inferior')                    gaps.push({ priority:'High',     gap:'Superiority vs. active comparator not demonstrated', action:'Identify secondary endpoints demonstrating differentiation (safety, convenience, adherence); design superiority sub-analysis' });
+  if (d.benefit === 'Head-to-head ongoing')            gaps.push({ priority:'High',     gap:'Head-to-head comparative trial results pending', action:'Develop indirect treatment comparison (ITC) or network meta-analysis as interim evidence bridge' });
+  if (d.trialPhase === 'Phase 2')                      gaps.push({ priority:'High',     gap:'Phase 3 confirmatory trial data not yet available', action:'Establish Phase 3 enrollment timelines; develop payer pre-submission strategy based on Phase 2 data package' });
+  if (d.icer === '>$200K' || d.icer === '$150K–$200K') gaps.push({ priority:'Medium',   gap:`ICER (${d.icer}/QALY) exceeds standard payer WTP thresholds`, action:'Develop outcomes-based contracting framework; build total cost-of-care and budget impact offset models' });
+  if (!d.payerSegments?.length)                        gaps.push({ priority:'Medium',   gap:'Target payer segment strategy not defined', action:'Conduct payer landscape assessment and segment-specific value story development' });
+  if (gaps.length === 0) gaps.push({ priority:'Low', gap:'No critical evidence gaps identified based on current profile', action:'Maintain ongoing surveillance of competitive evidence; update cost-effectiveness model annually' });
+  return gaps;
+}
+
+function genRWEStudies(d) {
+  const byArea = {
+    'Oncology':      ['Registry-based overall survival analysis vs. historical controls (SEER linkage)','Real-world treatment pattern and line-of-therapy analysis (claims database)','Patient-reported quality of life longitudinal cohort study'],
+    'Cardiology':    ['MACE event tracking in real-world Medicare population (CMS claims linkage)','Comparative medication adherence and persistence study','Healthcare resource utilization and hospitalization analysis'],
+    'Rare Disease':  ['Natural history study comparison with disease registry controls','Long-term safety surveillance registry (5+ year follow-up)','Healthcare utilization and total cost-of-care analysis in specialty centers'],
+    'Diabetes':      ['Long-term glycemic outcomes and HbA1c trajectory study (EHR-based)','CV event tracking registry in high-risk subpopulation','Real-world adherence, persistence, and hypoglycemia event analysis'],
+    'Neurology':     ['Biomarker-validated outcome longitudinal study','Disease progression registry with patient-reported functional outcomes','Time-to-relapse and healthcare utilization analysis (EMR-linked)'],
+    'Other':         ['Retrospective matched-cohort comparative effectiveness study','Claims-based treatment pattern and switching analysis','Real-world safety surveillance and patient-reported outcomes program'],
+  };
+  return byArea[d.therapeuticArea] || byArea['Other'];
+}
+
+function genPayerNarratives(d) {
+  const name = d.drugName || 'This product';
+  const endpt = d.primaryEndpoint || 'primary endpoint';
+  const comp  = d.comparator || 'comparator';
+  const benefitWord = d.benefit === 'Statistically superior' ? 'statistically significant improvement' : d.benefit === 'Non-inferior' ? 'clinical non-inferiority' : 'clinical benefit';
+
+  const narrativeMap = {
+    'Medicare Part D': {
+      headline: `${name} delivers ${benefitWord} in ${d.therapeuticArea||'the target indication'}, supporting formulary access for the Medicare population.`,
+      points: [
+        `${d.trialPhase} clinical data demonstrates ${d.benefit||'clinical benefit'} on ${endpt} vs. ${comp} in a patient population representative of Medicare beneficiaries`,
+        d.icer && d.icer !== 'Not yet modeled' ? `Cost-effectiveness analysis supports a value-based price at ${d.icer}/QALY relative to standard of care` : 'Cost-utility modeling underway; outcomes-based contracting available to align price with demonstrated value',
+        d.rwe !== 'None' ? 'Real-world evidence confirms clinical trial outcomes translate to the broader Medicare population' : 'Prospective real-world evidence program planned to supplement RCT data in Medicare-relevant population',
+      ],
+      objection: d.benefit === 'Non-inferior' ? `"Non-inferiority does not justify formulary access over existing generics." → Non-inferiority vs. ${comp} with a differentiated ${d.safety.toLowerCase()} safety profile supports preferred formulary tier and warrants outcomes-based contracting.` : `"How does this compare to existing formulary alternatives?" → ${name} demonstrates ${benefitWord} on ${endpt} in head-to-head data vs. ${comp}, supporting Tier 2 formulary placement.`,
+    },
+    'Medicaid': {
+      headline: `${name} offers clinical differentiation in ${d.therapeuticArea||'the target area'} with a Medicaid rebate strategy built on demonstrated outcomes.`,
+      points: [
+        `Supplemental rebate framework available; base rebate structured to meet AMP-based statutory floor with outcomes-linked upside`,
+        d.therapeuticArea === 'Rare Disease' || d.designations?.includes('Orphan Drug') ? 'Orphan drug status and small eligible population limits Medicaid budget impact; carve-out from managed care formulary management supported' : `State supplemental rebate negotiations anchored on ${endpt} outcomes data and total cost-of-care modeling`,
+        'Best Price monitoring in place; IRA MFP implications assessed and factored into Medicaid net price strategy',
+      ],
+      objection: `"How does the Best Price interact with any value-based arrangements?" → VBC structures are designed with Best Price floor guardrails; arrangements are structured as field-of-use restrictions to protect net pricing integrity.`,
+    },
+    'Commercial / PBM': {
+      headline: `${name} supports preferred formulary positioning through clinical differentiation and flexible value-based contracting.`,
+      points: [
+        `${d.benefit === 'Statistically superior' ? `Statistically superior ${endpt} vs. ${comp} supports unrestricted formulary access without mandatory step therapy` : `Clinical data package supports Tier 2 formulary access with outcomes-linked performance guarantees`}`,
+        d.icer && d.icer !== 'Not yet modeled' && (d.icer === '<$50K' || d.icer === '$50K–$100K') ? `ICER (${d.icer}/QALY) falls within standard commercial WTP thresholds, supporting premium pricing without significant pushback` : 'Outcomes-based contracting framework available with performance metrics tied to validated real-world endpoints',
+        d.safety === 'Superior' ? `Superior safety vs. ${comp} reduces medical cost offsets associated with adverse events — quantifiable in budget impact model` : `Comparable safety profile vs. ${comp} supports formulary equivalence or preference based on net price negotiation`,
+      ],
+      objection: `"We will require step therapy through generic alternatives first." → Step therapy restriction is not clinically appropriate given the ${endpt} endpoint differentiation; step edit waiver criteria available for appropriate patient subpopulations.`,
+    },
+    'VA / DoD': {
+      headline: `${name} qualifies for VA National Formulary consideration based on ${trialPhase} evidence and Federal Ceiling Price positioning.`,
+      points: [
+        `Federal Ceiling Price (FCP) calculated at 76% of non-FAMP; VA rebate structure aligned with formulary tier objectives`,
+        `${d.trialPhase} data meets VA evidence standards for Pharmacy Benefits Management (PBM) national formulary review submission`,
+        d.designations?.includes('Breakthrough Therapy') || d.benefit === 'Statistically superior' ? 'Clinical differentiation vs. VA formulary alternatives supports National Formulary listing without restriction' : 'Criteria for Use (CFU) development underway to support restricted formulary access pending broader RWE generation',
+      ],
+      objection: `"VA class review may delay formulary access." → Engage VISN-level formulary committees with site-specific prescriber data and outcomes evidence; Non-Formulary (NF) approval pathway available during national class review period.`,
+    },
+    'Employer / Self-insured': {
+      headline: `${name} delivers measurable workforce health and productivity value, supporting employer formulary inclusion and outcomes-based benefit design.`,
+      points: [
+        `${d.therapeuticArea}-related absenteeism and productivity loss quantified in employer-specific budget impact model available upon request`,
+        d.rwe !== 'None' ? 'Real-world adherence and persistence data demonstrate sustained outcomes in working-age population' : 'Adherence support program and patient hub services included in product launch package',
+        'Outcomes-based benefit design contract structure available with guarantees tied to validated clinical or healthcare utilization endpoints',
+      ],
+      objection: `"Total drug cost is too high for our formulary tier structure." → Total cost-of-care modeling demonstrates ${name} reduces downstream medical costs (ER visits, hospitalizations) by an estimated [X]% in the ${d.therapeuticArea} population, offsetting pharmacy cost premium.`,
+    },
+  };
+
+  return (d.payerSegments || []).filter(s => narrativeMap[s]).map(s => ({ segment:s, ...narrativeMap[s] }));
+}
+
+function genChecklist(d) {
+  const rdy = (c) => c ? 'complete' : 'missing';
+  return [
+    { section:'Section 1: Administrative & Product Overview', status: d.drugName && d.indication ? 'complete' : 'in-progress', note: d.drugName ? `${d.drugName} — ${d.therapeuticArea}` : 'Drug name and indication required' },
+    { section:'Section 2: Disease & Condition Background', status: d.therapeuticArea ? 'in-progress' : 'missing', note: 'Epidemiology, burden of illness, and current treatment landscape narrative required' },
+    { section:'Section 3A: Clinical Evidence — Pivotal Trials', status: d.trialName && d.benefit ? 'complete' : 'in-progress', note: d.trialName ? `${d.trialName} (${d.trialPhase}) — ${d.benefit}` : 'Trial name and comparative benefit assessment required' },
+    { section:'Section 3B: Clinical Evidence — Comparative Effectiveness', status: d.benefit && d.comparator ? 'complete' : 'in-progress', note: d.benefit === 'Head-to-head ongoing' ? 'Indirect treatment comparison (ITC) required as interim evidence' : d.comparator ? `vs. ${d.comparator}` : 'Comparator and benefit data required' },
+    { section:'Section 3C: Safety & Tolerability Summary', status: d.safety ? 'complete' : 'missing', note: d.safety ? `Safety vs. ${d.comparator||'comparator'}: ${d.safety}` : 'Safety profile vs. comparator required' },
+    { section:'Section 4A: Pharmacoeconomic Evidence — Cost-Effectiveness', status: d.icer && d.icer !== 'Not yet modeled' ? 'complete' : d.icer === 'Not yet modeled' ? 'missing' : 'missing', note: d.icer && d.icer !== 'Not yet modeled' ? `ICER ${d.icer}/QALY` : 'Cost-utility model (cost per QALY) required — Critical gap' },
+    { section:'Section 4B: Budget Impact Analysis', status: 'in-progress', note: 'Payer-specific budget impact model required; population size and market share assumptions needed' },
+    { section:'Section 5: Real-World Evidence Summary', status: rdy(d.rwe !== 'None'), note: d.rwe !== 'None' ? `RWE status: ${d.rwe}` : 'No RWE available — high priority gap for payer submissions' },
+    { section:'Section 6: Patient Registry & Long-Term Data', status: rdy(d.registry === 'yes'), note: d.registry === 'yes' ? 'Active patient registry data available' : 'Patient registry not established — required for rare disease and specialty submissions' },
+    { section:'Section 7: Product Support Programs', status: 'in-progress', note: 'Patient assistance, co-pay support, and hub services documentation required' },
+    { section:'Section 8: References & Evidence Bibliography', status: 'in-progress', note: 'Comprehensive literature bibliography required per AMCP format guidelines' },
+  ];
+}
+
+const STATUS_STYLE = {
+  complete:    { bg:'#f0fdf4', border:'#bbf7d0', color:'#15803d', icon:'✓', label:'Complete' },
+  'in-progress':{ bg:'#fffbeb', border:'#fde68a', color:'#b45309', icon:'◑', label:'In Progress' },
+  missing:     { bg:'#fef2f2', border:'#fecaca', color:'#b91c1c', icon:'✗', label:'Action Required' },
+};
+
+// ─── UI COMPONENTS ────────────────────────────────────────────────────────────
+
+function ReadinessGauge({ score }) {
+  const lvl = getReadinessLevel(score);
+  const r = 68, circ = Math.PI * r;
+  const filled = (score / 100) * circ;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+      <svg width="184" height="110" viewBox="0 0 184 110">
+        <path d={`M 24 94 A ${r} ${r} 0 0 0 160 94`} fill="none" stroke="#e5e7eb" strokeWidth="13" strokeLinecap="round"/>
+        <path d={`M 24 94 A ${r} ${r} 0 0 0 160 94`} fill="none" stroke={lvl.hex} strokeWidth="13"
+          strokeLinecap="round" strokeDasharray={`${filled} ${circ}`} strokeDashoffset="0"/>
+        <text x="92" y="83" textAnchor="middle" fontSize="38" fontWeight="800" fill={lvl.hex} fontFamily="Inter,system-ui">{score}</text>
+        <text x="92" y="102" textAnchor="middle" fontSize="11" fill="#9ca3af" fontFamily="Inter,system-ui">/ 100</text>
+      </svg>
+      <span style={{ backgroundColor:lvl.hex, color:'white', padding:'3px 16px', borderRadius:9999, fontSize:13, fontWeight:700, marginTop:4 }}>
+        {lvl.label}
+      </span>
+      <div style={{ display:'flex', gap:12, marginTop:10, fontSize:11, color:'#9ca3af' }}>
+        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#dc2626',marginRight:4}}/>0–39 Early Stage</span>
+        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#d97706',marginRight:4}}/>40–69 Developing</span>
+        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#16a34a',marginRight:4}}/>70+ Ready</span>
+      </div>
+    </div>
+  );
+}
+
+function FactorBar({ label, pts, max, note }) {
+  const pct = max > 0 ? (pts / max) * 100 : 0;
+  const color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
+  return (
+    <div style={{ paddingTop:10, paddingBottom:10, borderBottom:'1px solid #f3f4f6' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+        <span style={{ fontSize:13, fontWeight:500, color:'#374151' }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:700, color, fontVariantNumeric:'tabular-nums' }}>
+          {pts}<span style={{ color:'#d1d5db', fontWeight:400 }}> / {max}</span>
+        </span>
+      </div>
+      <div style={{ height:5, background:'#f3f4f6', borderRadius:999, marginBottom:5, overflow:'hidden' }}>
+        <div className="bar-fill" style={{ width:`${pct}%`, height:'100%', background:color, borderRadius:999 }}/>
+      </div>
+      <p style={{ fontSize:11, color:'#6b7280', lineHeight:1.5, margin:0 }}>{note}</p>
+    </div>
+  );
+}
+
+function ICERChart({ icerRange }) {
+  const zones = [
+    { label:'<$50K',       color:'#16a34a', pct:20 },
+    { label:'$50K–$100K',  color:'#65a30d', pct:40 },
+    { label:'$100K–$150K', color:'#d97706', pct:60 },
+    { label:'$150K–$200K', color:'#ea580c', pct:80 },
+    { label:'>$200K',      color:'#dc2626', pct:100 },
+  ];
+  const markerPct = { '<$50K':10, '$50K–$100K':30, '$100K–$150K':50, '$150K–$200K':70, '>$200K':90 }[icerRange];
+  const W = 460, H = 70, PAD = { l:20, r:20, t:10, b:28 };
+  const plotW = W - PAD.l - PAD.r;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto', display:'block' }}>
+      {/* Zone bars */}
+      {zones.map((z, i) => {
+        const prev = i === 0 ? 0 : zones[i-1].pct;
+        const x = PAD.l + (prev/100) * plotW;
+        const w = ((z.pct - prev)/100) * plotW;
+        return <rect key={i} x={x} y={PAD.t} width={w} height={22} fill={z.color} opacity="0.2" rx="2"/>;
+      })}
+      {/* Zone borders */}
+      {zones.slice(0,-1).map((z,i) => {
+        const x = PAD.l + (z.pct/100)*plotW;
+        return <line key={i} x1={x} y1={PAD.t} x2={x} y2={PAD.t+22} stroke="#e5e7eb" strokeWidth="1"/>;
+      })}
+      {/* WTP threshold labels */}
+      {[0,20,40,60,80,100].map((pct,i) => {
+        const labels = ['$0','$50K','$100K','$150K','$200K','>$200K'];
+        return <text key={i} x={PAD.l+(pct/100)*plotW} y={PAD.t+36} textAnchor="middle" fontSize="9" fill="#9ca3af" fontFamily="Inter,system-ui">{labels[i]}</text>;
+      })}
+      {/* Marker */}
+      {markerPct !== undefined && (
+        <>
+          <line x1={PAD.l+(markerPct/100)*plotW} y1={PAD.t-2} x2={PAD.l+(markerPct/100)*plotW} y2={PAD.t+28} stroke="#111827" strokeWidth="2.5" strokeLinecap="round"/>
+          <circle cx={PAD.l+(markerPct/100)*plotW} cy={PAD.t+11} r="5" fill="#111827"/>
+          <text x={PAD.l+(markerPct/100)*plotW} y={PAD.t+52} textAnchor="middle" fontSize="9.5" fill="#111827" fontWeight="700" fontFamily="Inter,system-ui">{icerRange}/QALY</text>
+        </>
+      )}
+      {!markerPct && <text x={W/2} y={PAD.t+15} textAnchor="middle" fontSize="11" fill="#9ca3af" fontFamily="Inter,system-ui">ICER not yet modeled</text>}
+    </svg>
+  );
+}
+
+function SectionCard({ number, title, sub, accentColor, children }) {
+  const accent = accentColor || '#7c3aed';
+  return (
+    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background:'#0f1f42', padding:'11px 22px', display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ width:22, height:22, borderRadius:999, background:'rgba(255,255,255,0.2)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{number}</span>
+        <div>
+          <div style={{ color:'#fff', fontWeight:700, fontSize:12, letterSpacing:'0.05em', textTransform:'uppercase' }}>{title}</div>
+          {sub && <div style={{ color:'#c4b5fd', fontSize:11, marginTop:1 }}>{sub}</div>}
+        </div>
+      </div>
+      <div style={{ height:3, background:`linear-gradient(90deg,${accent},${accent}88)` }}/>
+      <div style={{ padding:22 }}>{children}</div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, sub, valueColor, accent }) {
+  return (
+    <div style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:10, padding:'14px 16px', borderTop:`3px solid ${accent||'#7c3aed'}` }}>
+      <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:4 }}>{label}</div>
+      <div style={{ fontSize:18, fontWeight:800, color: valueColor||'#111827', lineHeight:1.2 }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:'#9ca3af', marginTop:3 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Toggle({ options, value, onChange }) {
+  return (
+    <div style={{ display:'flex', border:'1px solid #d1d5db', borderRadius:8, overflow:'hidden' }}>
+      {options.map(o => (
+        <button key={o.v} type="button" onClick={()=>onChange(o.v)}
+          style={{ flex:1, padding:'9px 8px', fontSize:13, fontWeight:500, border:'none', cursor:'pointer',
+            background: value===o.v ? '#0f1f42' : '#fff', color: value===o.v ? '#fff' : '#4b5563' }}>
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CheckboxGroup({ options, selected, onChange }) {
+  const toggle = (v) => onChange(selected.includes(v) ? selected.filter(x=>x!==v) : [...selected, v]);
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+      {options.map(o => (
+        <button key={o} type="button" onClick={()=>toggle(o)}
+          style={{ padding:'6px 12px', fontSize:12, fontWeight:500, borderRadius:6, cursor:'pointer', transition:'all 0.15s',
+            background: selected.includes(o) ? '#0f1f42' : '#f9fafb',
+            color:      selected.includes(o) ? '#fff'    : '#6b7280',
+            border:     selected.includes(o) ? '1px solid #0f1f42' : '1px solid #e5e7eb' }}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const PRIORITY_BADGE = { Critical:{ bg:'#fee2e2', color:'#b91c1c' }, High:{ bg:'#ffedd5', color:'#c2410c' }, Medium:{ bg:'#fef9c3', color:'#a16207' }, Low:{ bg:'#f0fdf4', color:'#15803d' } };
+function PBadge({ p }) {
+  const s = PRIORITY_BADGE[p] || { bg:'#f3f4f6', color:'#374151' };
+  return <span style={{ display:'inline-block', padding:'2px 9px', borderRadius:5, fontSize:11, fontWeight:700, background:s.bg, color:s.color, flexShrink:0 }}>{p}</span>;
+}
+
+function FieldErr({ msg }) {
+  return msg ? <div style={{ color:'#ef4444', fontSize:11, marginTop:4 }}>{msg}</div> : null;
+}
+
+const inputStyle = (err) => ({
+  width:'100%', borderRadius:8, border:`1px solid ${err?'#f87171':'#d1d5db'}`,
+  padding:'10px 14px', fontSize:13, outline:'none', boxSizing:'border-box',
+  background: err?'#fef2f2':'#fff', fontFamily:'inherit',
+});
+const selStyle = (err) => ({ ...inputStyle(err) });
+const Label = ({ children, sub }) => (
+  <div style={{ marginBottom:6 }}>
+    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151' }}>{children}</label>
+    {sub && <div style={{ fontSize:11, color:'#9ca3af', marginTop:1 }}>{sub}</div>}
+  </div>
+);
+const GroupHeader = ({ title }) => (
+  <div style={{ gridColumn:'1/-1', borderBottom:'2px solid #f3f4f6', paddingBottom:8, marginTop:4 }}>
+    <div style={{ fontSize:12, fontWeight:700, color:'#7c3aed', textTransform:'uppercase', letterSpacing:'0.07em' }}>{title}</div>
+  </div>
+);
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+
+function App() {
+  const [form, setForm]     = useState(INITIAL);
+  const [report, setReport] = useState(null);
+  const [errors, setErrors] = useState({});
+  const reportRef = useRef(null);
+
+  const set = (k, v) => { setForm(p=>({...p,[k]:v})); setErrors(p=>({...p,[k]:null})); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.drugName.trim())     e.drugName = 'Required';
+    if (!form.therapeuticArea)     e.therapeuticArea = 'Required';
+    if (!form.indication.trim())   e.indication = 'Required';
+    if (!form.primaryEndpoint)     e.primaryEndpoint = 'Required';
+    if (!form.benefit)             e.benefit = 'Required';
+    if (!form.comparator.trim())   e.comparator = 'Required';
+    if (!form.icer)                e.icer = 'Required';
+    return e;
+  };
+
+  const handleGenerate = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+
+    const readiness = calcReadiness(form);
+    const evidenceLevel = getEvidenceLevel(form);
+    const gaps = genEvidenceGaps(form);
+    const rweStudies = genRWEStudies(form);
+    const payerNarratives = genPayerNarratives(form);
+    const checklist = genChecklist(form);
+
+    const completeCount = checklist.filter(c => c.status === 'complete').length;
+    const checklistPct = Math.round((completeCount / checklist.length) * 100);
+
+    setReport({ readiness, evidenceLevel, gaps, rweStudies, payerNarratives, checklist, checklistPct, at: new Date() });
+    setTimeout(() => reportRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 80);
+  };
+
+  const readinessLvl = report ? getReadinessLevel(report.readiness.total) : null;
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#f8fafc' }}>
+      {/* Page header */}
+      <div style={{ background:'#0f1f42', padding:'28px 0 24px', borderBottom:'1px solid #1e3a6e' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto', padding:'0 24px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:36, height:36, background:'rgba(124,58,237,0.25)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <h1 style={{ color:'white', fontWeight:800, fontSize:20, margin:0, letterSpacing:'-0.01em' }}>HEOR Value Dossier Generator</h1>
+              <p style={{ color:'#c4b5fd', fontSize:12, margin:'2px 0 0' }}>AMCP dossier scaffolding · Evidence gap analysis · Payer value narrative · Readiness checklist</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'28px 24px 60px' }}>
+
+        {/* ── FORM ── */}
+        <form onSubmit={handleGenerate} noValidate style={{ marginBottom:36 }}>
+          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:26, boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'18px 28px' }}>
+
+              <GroupHeader title="Drug Profile"/>
+
+              <div style={{ gridColumn:'1/-1' }}>
+                <Label>Drug Name / Brand Name</Label>
+                <input type="text" value={form.drugName} onChange={e=>set('drugName',e.target.value)}
+                  placeholder="e.g., Keytruda, Ozempic, Leqembi" style={inputStyle(errors.drugName)}/>
+                <FieldErr msg={errors.drugName}/>
+              </div>
+
+              <div>
+                <Label>Therapeutic Area</Label>
+                <select value={form.therapeuticArea} onChange={e=>set('therapeuticArea',e.target.value)} style={selStyle(errors.therapeuticArea)}>
+                  <option value="">Select…</option>
+                  {THERAPEUTIC_AREAS.map(a=><option key={a} value={a}>{a}</option>)}
+                </select>
+                <FieldErr msg={errors.therapeuticArea}/>
+              </div>
+
+              <div>
+                <Label>Drug Type</Label>
+                <Toggle value={form.drugType} onChange={v=>set('drugType',v)}
+                  options={[{v:'small-molecule',l:'Small Molecule'},{v:'biologic',l:'Biologic'}]}/>
+              </div>
+
+              <div style={{ gridColumn:'1/-1' }}>
+                <Label sub="Specific disease or patient population targeted by the primary indication">Primary Indication</Label>
+                <input type="text" value={form.indication} onChange={e=>set('indication',e.target.value)}
+                  placeholder="e.g., Unresectable or metastatic NSCLC with PD-L1 TPS ≥ 50%" style={inputStyle(errors.indication)}/>
+                <FieldErr msg={errors.indication}/>
+              </div>
+
+              <div>
+                <Label>Mechanism of Action Class</Label>
+                <select value={form.mechanismClass} onChange={e=>set('mechanismClass',e.target.value)} style={selStyle()}>
+                  <option value="">Select…</option>
+                  {MECHANISM_CLASSES.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <Label sub="Select all that apply">Regulatory Designations</Label>
+                <CheckboxGroup options={DESIGNATIONS_LIST} selected={form.designations} onChange={v=>set('designations',v)}/>
+              </div>
+
+              <GroupHeader title="Clinical Evidence"/>
+
+              <div>
+                <Label>Key Pivotal Trial Name</Label>
+                <input type="text" value={form.trialName} onChange={e=>set('trialName',e.target.value)}
+                  placeholder="e.g., KEYNOTE-024, LEADER, MAGELLAN-1" style={inputStyle()}/>
+              </div>
+
+              <div>
+                <Label>Trial Phase</Label>
+                <Toggle value={form.trialPhase} onChange={v=>set('trialPhase',v)}
+                  options={TRIAL_PHASES.map(p=>({v:p,l:p}))}/>
+              </div>
+
+              <div>
+                <Label>Primary Endpoint</Label>
+                <select value={form.primaryEndpoint} onChange={e=>set('primaryEndpoint',e.target.value)} style={selStyle(errors.primaryEndpoint)}>
+                  <option value="">Select…</option>
+                  {ENDPOINTS.map(ep=><option key={ep} value={ep}>{ep}</option>)}
+                </select>
+                <FieldErr msg={errors.primaryEndpoint}/>
+              </div>
+
+              <div>
+                <Label sub="Primary endpoint result vs. key comparator">Benefit vs. Comparator</Label>
+                <select value={form.benefit} onChange={e=>set('benefit',e.target.value)} style={selStyle(errors.benefit)}>
+                  <option value="">Select…</option>
+                  {BENEFIT_OPTIONS.map(b=><option key={b} value={b}>{b}</option>)}
+                </select>
+                <FieldErr msg={errors.benefit}/>
+              </div>
+
+              <div>
+                <Label sub="Overall safety and tolerability vs. comparator">Safety vs. Comparator</Label>
+                <Toggle value={form.safety} onChange={v=>set('safety',v)}
+                  options={[{v:'Superior',l:'Superior'},{v:'Similar',l:'Similar'},{v:'Inferior',l:'Inferior'}]}/>
+              </div>
+
+              <div>
+                <Label>Key Clinical Comparator</Label>
+                <input type="text" value={form.comparator} onChange={e=>set('comparator',e.target.value)}
+                  placeholder="e.g., chemotherapy, placebo, sitagliptin" style={inputStyle(errors.comparator)}/>
+                <FieldErr msg={errors.comparator}/>
+              </div>
+
+              <GroupHeader title="Economic & Evidence Infrastructure"/>
+
+              <div>
+                <Label sub="Published ICER or internal model estimate">ICER ($/QALY) Range</Label>
+                <select value={form.icer} onChange={e=>set('icer',e.target.value)} style={selStyle(errors.icer)}>
+                  <option value="">Select range…</option>
+                  {ICER_RANGES.map(r=><option key={r} value={r}>{r} per QALY</option>)}
+                </select>
+                <FieldErr msg={errors.icer}/>
+              </div>
+
+              <div>
+                <Label>Real-World Evidence Status</Label>
+                <Toggle value={form.rwe} onChange={v=>set('rwe',v)}
+                  options={[{v:'Published',l:'Published'},{v:'In Development',l:'In Development'},{v:'None',l:'None'}]}/>
+              </div>
+
+              <div>
+                <Label sub="Active patient registry with longitudinal data">Patient Registry</Label>
+                <Toggle value={form.registry} onChange={v=>set('registry',v)}
+                  options={[{v:'no',l:'Not Established'},{v:'yes',l:'Active Registry'}]}/>
+              </div>
+
+              <div style={{ gridColumn:'1/-1' }}>
+                <Label sub="Select payer segments for value narrative generation">Target Payer Segments</Label>
+                <CheckboxGroup options={PAYER_SEGMENTS} selected={form.payerSegments} onChange={v=>set('payerSegments',v)}/>
+              </div>
+
+            </div>
+
+            <div style={{ marginTop:22, paddingTop:18, borderTop:'1px solid #f3f4f6', display:'flex', justifyContent:'flex-end' }}>
+              <button type="submit"
+                style={{ background:'#7c3aed', color:'#fff', padding:'11px 30px', borderRadius:9, fontWeight:700, fontSize:13, border:'none', cursor:'pointer' }}
+                onMouseOver={e=>e.target.style.background='#6d28d9'}
+                onMouseOut={e=>e.target.style.background='#7c3aed'}>
+                Generate Dossier →
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* ── REPORT ── */}
+        {report && (
+          <div ref={reportRef} className="fade-up">
+
+            {/* Sub-header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18, flexWrap:'wrap', gap:12 }} className="no-print">
+              <div>
+                <h2 style={{ fontSize:18, fontWeight:800, color:'#0f172a', margin:'0 0 2px' }}>
+                  HEOR Dossier: <span style={{ color:'#7c3aed' }}>{form.drugName}</span>
+                </h2>
+                <p style={{ fontSize:12, color:'#64748b', margin:0 }}>
+                  {form.therapeuticArea} · {form.drugType==='biologic'?'Biologic':'Small Molecule'} · Generated {report.at.toLocaleString()}
+                </p>
+              </div>
+              <button onClick={()=>window.print()}
+                style={{ display:'flex', alignItems:'center', gap:7, background:'#fff', border:'1px solid #d1d5db', color:'#374151', padding:'9px 16px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Export PDF
+              </button>
+            </div>
+
+            {/* Drug info bar */}
+            <div style={{ background:'#0f1f42', borderRadius:10, padding:'14px 20px', marginBottom:20, display:'flex', flexWrap:'wrap', gap:'10px 24px' }}>
+              {[['Drug',form.drugName||'—'],['Area',form.therapeuticArea],['Type',form.drugType==='biologic'?'Biologic':'Small Molecule'],['Indication',form.indication],['Trial',form.trialName||'—'],['Endpoint',form.primaryEndpoint],['vs.',form.comparator]].map(([k,v])=>(
+                <div key={k} style={{ color:'#fff', fontSize:13 }}>
+                  <span style={{ color:'#c4b5fd', marginRight:4 }}>{k}:</span><strong>{v}</strong>
+                </div>
+              ))}
+            </div>
+
+            {/* Key metrics */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:12, marginBottom:20 }}>
+              <MetricCard label="HEOR Readiness Score" value={`${report.readiness.total}/100`} sub={readinessLvl.label} valueColor={readinessLvl.hex} accent={readinessLvl.hex}/>
+              <MetricCard label="Evidence Level" value={report.evidenceLevel.level} sub={report.evidenceLevel.level==='Level I'?'Highest evidentiary standard':report.evidenceLevel.level==='Level II'?'Accepted by most payers':'Supplementary evidence required'} valueColor={report.evidenceLevel.color} accent={report.evidenceLevel.color}/>
+              <MetricCard label="ICER Position" value={form.icer==='Not yet modeled'?'Not Modeled':form.icer} sub={form.icer==='Not yet modeled'?'Critical gap — model required':'Per QALY gained'} valueColor={['<$50K','$50K–$100K'].includes(form.icer)?'#16a34a':['$100K–$150K'].includes(form.icer)?'#d97706':'#dc2626'} accent="#7c3aed"/>
+              <MetricCard label="Checklist Readiness" value={`${report.checklistPct}%`} sub={`${report.checklist.filter(c=>c.status==='complete').length} of ${report.checklist.length} sections complete`} valueColor={report.checklistPct>=70?'#16a34a':report.checklistPct>=40?'#d97706':'#dc2626'} accent="#0891b2"/>
+            </div>
+
+            {/* ── SECTION 1: READINESS SCORE ── */}
+            <SectionCard number="1" title="HEOR Dossier Readiness Score" sub="Evidence maturity assessment across 6 weighted dimensions">
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:32 }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+                  <ReadinessGauge score={report.readiness.total}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>Readiness by Dimension</div>
+                  {report.readiness.factors.map((f,i) => <FactorBar key={i} {...f}/>)}
+                </div>
+              </div>
+
+              {/* Evidence level box */}
+              <div style={{ marginTop:20, padding:16, borderRadius:10, background: report.evidenceLevel.level==='Level I'?'#f0fdf4':report.evidenceLevel.level==='Level II'?'#fffbeb':'#fef2f2', border:`1px solid ${report.evidenceLevel.level==='Level I'?'#bbf7d0':report.evidenceLevel.level==='Level II'?'#fde68a':'#fecaca'}` }}>
+                <div style={{ fontWeight:700, fontSize:14, color: report.evidenceLevel.color, marginBottom:5 }}>
+                  Evidence Quality: {report.evidenceLevel.level}
+                </div>
+                <div style={{ fontSize:13, color: report.evidenceLevel.color, lineHeight:1.65 }}>{report.evidenceLevel.desc}</div>
+              </div>
+            </SectionCard>
+
+            {/* ── SECTION 2: CLINICAL EVIDENCE PACKAGE ── */}
+            <SectionCard number="2" title="Clinical Evidence Package" sub="Trial design, comparative effectiveness, and evidence gap analysis">
+              {/* Trial summary */}
+              <div style={{ background:'#f9fafb', borderRadius:10, padding:18, border:'1px solid #f1f5f9', marginBottom:20 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:14 }}>Pivotal Trial Summary</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
+                  {[
+                    ['Trial Name',     form.trialName||'—'],
+                    ['Phase',          form.trialPhase],
+                    ['Primary Endpoint', form.primaryEndpoint],
+                    ['Result vs. Comparator', form.benefit],
+                    ['Safety Profile', `${form.safety} vs. ${form.comparator||'comparator'}`],
+                    ['Mechanism Class', form.mechanismClass||'—'],
+                  ].map(([k,v]) => (
+                    <div key={k}>
+                      <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.05em' }}>{k}</div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#111827', marginTop:2 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {form.designations?.length > 0 && (
+                  <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid #e5e7eb' }}>
+                    <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Regulatory Designations</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {form.designations.map(d=>(
+                        <span key={d} style={{ padding:'3px 10px', background:'#ede9fe', color:'#6d28d9', borderRadius:5, fontSize:11, fontWeight:600 }}>{d}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Evidence gaps */}
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>Evidence Gap Analysis</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {report.gaps.map((g,i) => (
+                    <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr 1fr', gap:12, alignItems:'start', padding:14, background:'#f9fafb', borderRadius:9, border:'1px solid #f1f5f9' }}>
+                      <PBadge p={g.priority}/>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:'#111827', marginBottom:2 }}>Gap Identified</div>
+                        <div style={{ fontSize:12, color:'#64748b' }}>{g.gap}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:'#111827', marginBottom:2 }}>Recommended Action</div>
+                        <div style={{ fontSize:12, color:'#64748b' }}>{g.action}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* ── SECTION 3: HEALTH ECONOMIC ASSESSMENT ── */}
+            <SectionCard number="3" title="Health Economic Assessment" sub="ICER positioning, willingness-to-pay thresholds, and value-based contracting framework">
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>ICER Position Relative to WTP Thresholds</div>
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:18, border:'1px solid #f1f5f9' }}>
+                  <ICERChart icerRange={form.icer}/>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10, marginTop:16 }}>
+                    {[['<$100K','Standard commercial','#16a34a'],['$100K–$150K','Upper commercial range','#d97706'],['$150K–$200K','Specialty threshold','#ea580c'],['>$200K','Ultra-rare / premium','#dc2626']].map(([range,label,color])=>(
+                      <div key={range} style={{ fontSize:11, color:'#6b7280' }}>
+                        <span style={{ display:'inline-block', width:10, height:10, borderRadius:2, background:color, opacity:0.6, marginRight:5, verticalAlign:'middle' }}/>
+                        <strong style={{ color:'#374151' }}>{range}</strong>: {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:16, border:'1px solid #f1f5f9' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#374151', marginBottom:8 }}>Budget Impact Framework</div>
+                  <ul style={{ fontSize:12, color:'#64748b', lineHeight:2, paddingLeft:16, margin:0 }}>
+                    <li>1-year and 3-year payer budget impact models required</li>
+                    <li>Drug cost offset against downstream medical savings</li>
+                    <li>Market share ramp assumptions by payer type</li>
+                    <li>Per-member-per-month (PMPM) impact calculation</li>
+                  </ul>
+                </div>
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:16, border:'1px solid #f1f5f9' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#374151', marginBottom:8 }}>Value-Based Contracting Options</div>
+                  <ul style={{ fontSize:12, color:'#64748b', lineHeight:2, paddingLeft:16, margin:0 }}>
+                    {form.benefit === 'Statistically superior'
+                      ? <><li>Outcomes guarantee on primary clinical endpoint</li><li>Performance-based rebate tier linked to real-world response</li></>
+                      : <><li>Indication-based pricing with clinical criteria</li><li>Performance rebate on validated surrogate endpoint</li></>}
+                    <li>Risk-sharing on total cost-of-care vs. comparator</li>
+                    <li>Multi-year outcomes contract with annual reconciliation</li>
+                  </ul>
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* ── SECTION 4: RWE STRATEGY ── */}
+            <SectionCard number="4" title="Real-World Evidence Strategy" sub="Evidence generation plan, study design recommendations, and timeline">
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#374151', marginBottom:12 }}>Recommended RWE Study Designs</div>
+                  {report.rweStudies.map((s,i)=>(
+                    <div key={i} style={{ display:'flex', gap:10, marginBottom:12 }}>
+                      <div style={{ width:22, height:22, borderRadius:999, background:'#ede9fe', color:'#7c3aed', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</div>
+                      <span style={{ fontSize:13, color:'#4b5563', lineHeight:1.65 }}>{s}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#374151', marginBottom:12 }}>Evidence Generation Timeline</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {[
+                      { phase:'0–6 months',  action:'Retrospective claims analysis; database selection and protocol development', color:'#7c3aed' },
+                      { phase:'6–18 months', action:'Prospective registry enrollment; real-world comparative cohort design', color:'#0891b2' },
+                      { phase:'18–36 months',action:'Interim RWE data readout; payer advisory board presentations', color:'#16a34a' },
+                      { phase:'36+ months',  action:'Full publication of real-world outcomes; HTA submission updates', color:'#d97706' },
+                    ].map(t => (
+                      <div key={t.phase} style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:t.color, whiteSpace:'nowrap', minWidth:95, paddingTop:1 }}>{t.phase}</span>
+                        <span style={{ fontSize:12, color:'#64748b', lineHeight:1.6 }}>{t.action}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* ── SECTION 5: PAYER VALUE NARRATIVE ── */}
+            {report.payerNarratives.length > 0 && (
+              <SectionCard number="5" title="Payer Value Narrative" sub="Segment-specific value messages, supporting evidence, and objection handlers">
+                <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                  {report.payerNarratives.map((n,i) => (
+                    <div key={i} style={{ border:'1px solid #e5e7eb', borderRadius:10, overflow:'hidden' }}>
+                      <div style={{ background:'#faf5ff', padding:'10px 16px', borderBottom:'1px solid #ede9fe', display:'flex', alignItems:'center', gap:8 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                        <span style={{ fontSize:13, fontWeight:700, color:'#6d28d9' }}>{n.segment}</span>
+                      </div>
+                      <div style={{ padding:16 }}>
+                        <p style={{ fontSize:13, fontWeight:600, color:'#1e293b', marginBottom:10, lineHeight:1.6 }}>{n.headline}</p>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:12 }}>
+                          {n.points.map((p,j) => (
+                            <div key={j} style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" style={{ flexShrink:0, marginTop:2 }}><polyline points="9 18 15 12 9 6"/></svg>
+                              <span style={{ fontSize:12, color:'#475569', lineHeight:1.65 }}>{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ background:'#f8fafc', borderRadius:8, padding:12, border:'1px solid #e2e8f0' }}>
+                          <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Objection Handler</div>
+                          <p style={{ fontSize:12, color:'#475569', lineHeight:1.65, margin:0 }}>{n.objection}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* ── SECTION 6: AMCP CHECKLIST ── */}
+            <SectionCard number={report.payerNarratives.length > 0 ? '6' : '5'} title="AMCP Dossier Submission Checklist" sub={`${report.checklistPct}% complete — ${report.checklist.filter(c=>c.status==='complete').length} of ${report.checklist.length} sections ready`}>
+              {/* Progress bar */}
+              <div style={{ height:6, background:'#f3f4f6', borderRadius:999, marginBottom:20, overflow:'hidden' }}>
+                <div className="bar-fill" style={{ width:`${report.checklistPct}%`, height:'100%', background: report.checklistPct>=70?'#16a34a':report.checklistPct>=40?'#d97706':'#dc2626', borderRadius:999 }}/>
+              </div>
+              <div>
+                {report.checklist.map((item,i) => {
+                  const s = STATUS_STYLE[item.status];
+                  return (
+                    <div key={i} className="check-item">
+                      <div style={{ width:22, height:22, borderRadius:999, background:s.bg, border:`1px solid ${s.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:11, fontWeight:800, color:s.color }}>{s.icon}</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:'#1e293b' }}>{item.section}</span>
+                          <span style={{ fontSize:10, fontWeight:700, color:s.color, background:s.bg, border:`1px solid ${s.border}`, padding:'1px 7px', borderRadius:4 }}>{s.label}</span>
+                        </div>
+                        <span style={{ fontSize:11, color:'#64748b' }}>{item.note}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </SectionCard>
+
+            {/* Footer */}
+            <div style={{ paddingTop:14, borderTop:'1px solid #e5e7eb', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8, fontSize:11, color:'#9ca3af', paddingBottom:20 }}>
+              <span>MarketAccess.ai HEOR Value Dossier Generator · AMCP Format Guidance Reference</span>
+              <span>Generated {report.at.toLocaleString()} · Not a substitute for formal HTA submission or regulatory counsel</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
