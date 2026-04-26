@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CMS Outcome Simulator — MarketAccess.ai</title>
+  <meta name="description" content="Simulate IRA drug price negotiation financial outcomes — MFP discount tiers, revenue impact, and 5-year trajectory modeling." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .fade-up { animation: fadeUp 0.4s ease-out forwards; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .bar-fill { transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+    @media print {
+      * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+      @page { margin:0.45in; size:letter portrait; }
+      body { background:white!important; }
+      .no-print { display:none!important; }
+    }
+  </style>
+</head>
+<body style="background:#f8fafc;min-height:100vh;margin:0;">
+
+<!-- Suite Nav -->
+<nav style="background:#070f22;padding:9px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1e3a6e;font-family:Inter,system-ui;position:sticky;top:0;z-index:50;" class="no-print">
+  <a href="index.html" style="display:flex;align-items:center;gap:9px;text-decoration:none;">
+    <div style="width:28px;height:28px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <div style="line-height:1;">
+      <span style="color:white;font-weight:800;font-size:14px;">MarketAccess.ai</span>
+      <span style="color:#60a5fa;font-size:10px;margin-left:7px;text-transform:uppercase;letter-spacing:0.06em;">IRA Strategy Suite</span>
+    </div>
+  </a>
+  <div style="display:flex;gap:24px;align-items:center;">
+    <a href="index.html"         style="color:#93c5fd;font-size:12px;font-weight:500;text-decoration:none;">Home</a>
+    <a href="analyzer.html"      style="color:#93c5fd;font-size:12px;font-weight:500;text-decoration:none;">Risk Analyzer</a>
+    <a href="cms-simulator.html" style="color:white;font-size:12px;font-weight:600;text-decoration:none;border-bottom:2px solid #0891b2;padding-bottom:1px;">CMS Simulator</a>
+    <a href="#"                  style="color:#4b5563;font-size:12px;font-weight:500;text-decoration:none;pointer-events:none;">HEOR Dossier<span style="font-size:9px;background:#1e3a6e;color:#60a5fa;padding:1px 5px;border-radius:3px;margin-left:4px;">Soon</span></a>
+  </div>
+</nav>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useRef, useMemo } = React;
+
+const THERAPEUTIC_AREAS = ['Oncology','Cardiology','Rare Disease','Diabetes','Neurology','Other'];
+const VOLUME_GROWTH = 0.02; // 2% annual Medicare volume growth assumption
+
+const INITIAL = {
+  drugName:'', wac:'', annualUnits:'', drugType:'small-molecule',
+  yearsSinceApproval:'', therapeuticArea:'',
+};
+
+// ─── DISCOUNT TIER LOGIC ──────────────────────────────────────────────────────
+
+function getDiscountTier(drugType, years) {
+  const y = parseInt(years) || 0;
+  if (drugType === 'small-molecule') {
+    if (y < 9)  return null;                               // not yet eligible
+    if (y < 12) return { pct:25, label:'25%', tier:'Tier 1', desc:'9–12 years post-approval' };
+    if (y < 16) return { pct:35, label:'35%', tier:'Tier 2', desc:'12–16 years post-approval' };
+    return          { pct:60, label:'60%', tier:'Tier 3', desc:'16+ years post-approval' };
+  } else {
+    if (y < 13) return null;
+    if (y < 16) return { pct:25, label:'25%', tier:'Tier 1', desc:'13–16 years post-approval' };
+    if (y < 18) return { pct:35, label:'35%', tier:'Tier 2', desc:'16–18 years post-approval' };
+    return          { pct:60, label:'60%', tier:'Tier 3', desc:'18+ years post-approval' };
+  }
+}
+
+function getScenarios(wac, discountTier) {
+  if (!discountTier) return null;
+  // Floor = statutory ceiling discount, Base = +7%, Aggressive = +12% beyond ceiling
+  const basePct  = Math.min(discountTier.pct + 7, 75);
+  const aggrPct  = Math.min(discountTier.pct + 15, 80);
+  return [
+    { label:'Statutory Ceiling', pct: discountTier.pct,  mfp: wac*(1-discountTier.pct/100), color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
+    { label:'Analyst Base Case', pct: basePct,            mfp: wac*(1-basePct/100),           color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
+    { label:'CMS Aggressive',    pct: aggrPct,            mfp: wac*(1-aggrPct/100),            color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
+  ];
+}
+
+function buildProjection(currentRevenue, mfp, wac, units) {
+  // Year 0 = current (pre-negotiation), Years 1-5 = post-MFP with volume growth
+  return Array.from({ length:6 }, (_, i) => {
+    const vol = units * Math.pow(1 + VOLUME_GROWTH, i);
+    return {
+      year: i,
+      label: i === 0 ? 'Current' : `Yr ${i}`,
+      preMFP:  wac * vol,
+      postMFP: i === 0 ? wac * units : mfp * vol,
+    };
+  });
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+const fmt = (n) => {
+  if (!n && n!==0) return '—';
+  if (Math.abs(n) >= 1e9) return `$${(n/1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e6) return `$${(n/1e6).toFixed(1)}M`;
+  return `$${n.toLocaleString('en-US', {maximumFractionDigits:0})}`;
+};
+const fmtM = (n) => n >= 1e9 ? `$${(n/1e9).toFixed(2)}B` : `$${(n/1e6).toFixed(1)}M`;
+const pctFmt = (n) => `${n.toFixed(1)}%`;
+
+// ─── SVG LINE CHART ───────────────────────────────────────────────────────────
+
+function RevenueChart({ projection, baseScenario }) {
+  if (!projection || !baseScenario) return null;
+
+  const W = 520, H = 200;
+  const PAD = { top:16, right:24, bottom:36, left:72 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const allVals = projection.flatMap(p => [p.preMFP, p.postMFP]);
+  const maxVal  = Math.max(...allVals) * 1.08;
+  const minVal  = Math.min(...allVals) * 0.88;
+
+  const xPos = (i) => PAD.left + (i / (projection.length - 1)) * plotW;
+  const yPos = (v) => PAD.top + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
+
+  const prePath  = projection.map((p,i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(p.preMFP).toFixed(1)}`).join(' ');
+  const postPath = projection.map((p,i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(p.postMFP).toFixed(1)}`).join(' ');
+
+  // Fill area between the two curves
+  const fillPath = [
+    ...projection.map((p,i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(p.preMFP).toFixed(1)}`),
+    ...[...projection].reverse().map((p,i,arr) => `L${xPos(arr.length-1-i).toFixed(1)},${yPos(p.postMFP).toFixed(1)}`),
+    'Z'
+  ].join(' ');
+
+  // Y-axis labels (4 ticks)
+  const ticks = [0,1,2,3].map(i => {
+    const v = minVal + (i/3) * (maxVal - minVal);
+    return { v, y: yPos(v) };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto', display:'block' }}>
+      {/* Grid lines */}
+      {ticks.map((t,i) => (
+        <line key={i} x1={PAD.left} y1={t.y.toFixed(1)} x2={W-PAD.right} y2={t.y.toFixed(1)}
+          stroke="#f1f5f9" strokeWidth="1"/>
+      ))}
+
+      {/* Y-axis labels */}
+      {ticks.map((t,i) => (
+        <text key={i} x={PAD.left-6} y={t.y+4} textAnchor="end" fontSize="10" fill="#94a3b8" fontFamily="Inter,system-ui">
+          {fmtM(t.v)}
+        </text>
+      ))}
+
+      {/* X-axis labels */}
+      {projection.map((p,i) => (
+        <text key={i} x={xPos(i)} y={H-8} textAnchor="middle" fontSize="11" fill="#64748b" fontFamily="Inter,system-ui">
+          {p.label}
+        </text>
+      ))}
+
+      {/* Filled gap area */}
+      <path d={fillPath} fill="#fee2e2" opacity="0.45"/>
+
+      {/* Pre-MFP line (dashed, gray) */}
+      <path d={prePath} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 4"/>
+
+      {/* Post-MFP line (solid, teal) */}
+      <path d={postPath} fill="none" stroke="#0891b2" strokeWidth="2.5"/>
+
+      {/* Dots on post-MFP */}
+      {projection.map((p,i) => (
+        i > 0 && <circle key={i} cx={xPos(i)} cy={yPos(p.postMFP)} r="3.5" fill="#0891b2"/>
+      ))}
+      {/* Dot on current */}
+      <circle cx={xPos(0)} cy={yPos(projection[0].preMFP)} r="4" fill="#94a3b8"/>
+
+      {/* Legend */}
+      <line x1={PAD.left} y1={H-4} x2={PAD.left+24} y2={H-4} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 3"/>
+      <text x={PAD.left+28} y={H-1} fontSize="10" fill="#94a3b8" fontFamily="Inter,system-ui">Pre-MFP trajectory</text>
+      <line x1={PAD.left+160} y1={H-4} x2={PAD.left+184} y2={H-4} stroke="#0891b2" strokeWidth="2"/>
+      <circle cx={PAD.left+172} cy={H-4} r="3" fill="#0891b2"/>
+      <text x={PAD.left+188} y={H-1} fontSize="10" fill="#0891b2" fontFamily="Inter,system-ui">Post-MFP revenue</text>
+    </svg>
+  );
+}
+
+// ─── UI COMPONENTS ────────────────────────────────────────────────────────────
+
+function SectionCard({ number, title, sub, children }) {
+  return (
+    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background:'#0f1f42', padding:'11px 22px', display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ width:22, height:22, borderRadius:999, background:'rgba(255,255,255,0.2)', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{number}</span>
+        <div>
+          <div style={{ color:'#fff', fontWeight:700, fontSize:12, letterSpacing:'0.05em', textTransform:'uppercase' }}>{title}</div>
+          {sub && <div style={{ color:'#93c5fd', fontSize:11, marginTop:1 }}>{sub}</div>}
+        </div>
+      </div>
+      <div style={{ padding:22 }}>{children}</div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, sub, valueColor, accent }) {
+  return (
+    <div style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:10, padding:'14px 16px', borderTop:`3px solid ${accent||'#e5e7eb'}` }}>
+      <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:4 }}>{label}</div>
+      <div style={{ fontSize:20, fontWeight:800, color: valueColor||'#111827', lineHeight:1.2 }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:'#9ca3af', marginTop:3 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Toggle({ options, value, onChange }) {
+  return (
+    <div style={{ display:'flex', border:'1px solid #d1d5db', borderRadius:8, overflow:'hidden' }}>
+      {options.map(o => (
+        <button key={o.v} type="button" onClick={()=>onChange(o.v)}
+          style={{ flex:1, padding:'9px 8px', fontSize:13, fontWeight:500, border:'none', cursor:'pointer',
+            background: value===o.v ? '#0f1f42' : '#fff',
+            color:      value===o.v ? '#fff'    : '#4b5563' }}>
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FieldErr({ msg }) {
+  return msg ? <div style={{ color:'#ef4444', fontSize:11, marginTop:4 }}>{msg}</div> : null;
+}
+
+const inp = (err) => ({
+  width:'100%', borderRadius:8, border:`1px solid ${err?'#f87171':'#d1d5db'}`,
+  padding:'10px 14px', fontSize:13, outline:'none', boxSizing:'border-box',
+  background: err ? '#fef2f2' : '#fff', fontFamily:'inherit',
+});
+const sel = (err) => ({ ...inp(err) });
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+
+function App() {
+  const [form, setForm]     = useState(INITIAL);
+  const [report, setReport] = useState(null);
+  const [errors, setErrors] = useState({});
+  const reportRef = useRef(null);
+
+  const set = (k,v) => { setForm(p=>({...p,[k]:v})); setErrors(p=>({...p,[k]:null})); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.drugName.trim()) e.drugName = 'Required';
+    if (!form.wac || isNaN(form.wac) || Number(form.wac) <= 0)
+      e.wac = 'Enter a valid WAC per unit (> $0)';
+    if (!form.annualUnits || isNaN(form.annualUnits) || Number(form.annualUnits) < 1)
+      e.annualUnits = 'Enter a valid unit count (≥ 1)';
+    if (form.yearsSinceApproval==='' || isNaN(form.yearsSinceApproval) || Number(form.yearsSinceApproval)<0)
+      e.yearsSinceApproval = 'Enter a valid number of years';
+    if (!form.therapeuticArea) e.therapeuticArea = 'Required';
+    return e;
+  };
+
+  const handleGenerate = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+
+    const wac   = parseFloat(form.wac);
+    const units = parseFloat(form.annualUnits);
+    const discountTier  = getDiscountTier(form.drugType, form.yearsSinceApproval);
+    const scenarios     = discountTier ? getScenarios(wac, discountTier) : null;
+    const baseMFP       = scenarios ? scenarios[1].mfp : wac;
+    const projection    = buildProjection(wac * units, baseMFP, wac, units);
+    const currentRev    = wac * units;
+    const baseRev       = baseMFP * units;
+    const delta         = baseRev - currentRev;
+    const deltaPct      = (delta / currentRev) * 100;
+    const fiveYearImpact = projection.slice(1).reduce((acc, p) => acc + (p.preMFP - p.postMFP), 0);
+
+    setReport({ wac, units, discountTier, scenarios, projection, currentRev, baseRev, delta, deltaPct, fiveYearImpact, at: new Date() });
+    setTimeout(()=>reportRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 80);
+  };
+
+  const eligible = getDiscountTier(form.drugType, form.yearsSinceApproval);
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#f8fafc', paddingBottom:60 }}>
+      {/* Page header */}
+      <div style={{ background:'#0f1f42', padding:'28px 0 24px', borderBottom:'1px solid #1e3a6e' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto', padding:'0 24px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6 }}>
+            <div style={{ width:36, height:36, background:'rgba(8,145,178,0.25)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>
+                <path d="M7 8h.01M7 12h.01M12 8h5M12 12h5"/>
+              </svg>
+            </div>
+            <div>
+              <h1 style={{ color:'white', fontWeight:800, fontSize:20, margin:0, letterSpacing:'-0.01em' }}>CMS Outcome Simulator</h1>
+              <p style={{ color:'#93c5fd', fontSize:12, margin:0, marginTop:2 }}>MFP discount tier modeling · Revenue impact analysis · 5-year trajectory</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'28px 24px 0' }}>
+
+        {/* ── INPUT FORM ── */}
+        <div style={{ marginBottom:36 }}>
+          <form onSubmit={handleGenerate} noValidate>
+            <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:26, boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:18, paddingBottom:14, borderBottom:'1px solid #f3f4f6' }}>
+                Product &amp; Revenue Inputs
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'18px 28px' }}>
+
+                {/* Drug Name */}
+                <div style={{ gridColumn:'1/-1' }}>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>Drug Name / Brand Name</label>
+                  <input type="text" value={form.drugName} onChange={e=>set('drugName',e.target.value)}
+                    placeholder="e.g., Eliquis, Keytruda, Jardiance" style={inp(errors.drugName)}/>
+                  <FieldErr msg={errors.drugName}/>
+                </div>
+
+                {/* WAC */}
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>
+                    Current WAC per Unit ($)
+                  </label>
+                  <input type="number" min="0.01" step="0.01" value={form.wac}
+                    onChange={e=>set('wac',e.target.value)} placeholder="e.g., 18.50" style={inp(errors.wac)}/>
+                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>Wholesale acquisition cost per dispensed unit. Used as non-FAMP proxy.</div>
+                  <FieldErr msg={errors.wac}/>
+                </div>
+
+                {/* Annual Units */}
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>
+                    Annual Medicare Covered Units
+                  </label>
+                  <input type="number" min="1" value={form.annualUnits}
+                    onChange={e=>set('annualUnits',e.target.value)} placeholder="e.g., 5000000" style={inp(errors.annualUnits)}/>
+                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>Total dispensed units reimbursed under Medicare Part D annually.</div>
+                  <FieldErr msg={errors.annualUnits}/>
+                </div>
+
+                {/* Drug Type */}
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>Drug Type</label>
+                  <Toggle value={form.drugType} onChange={v=>set('drugType',v)}
+                    options={[{v:'small-molecule',l:'Small Molecule'},{v:'biologic',l:'Biologic'}]}/>
+                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>
+                    MTEP threshold: <strong>{form.drugType==='small-molecule'?'9':'13'} years</strong> · determines applicable discount tier
+                  </div>
+                </div>
+
+                {/* Years Since Approval */}
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>Years Since FDA Approval</label>
+                  <input type="number" min="0" max="60" value={form.yearsSinceApproval}
+                    onChange={e=>set('yearsSinceApproval',e.target.value)} placeholder="e.g., 11" style={inp(errors.yearsSinceApproval)}/>
+                  {form.yearsSinceApproval && (
+                    <div style={{ fontSize:11, marginTop:4, color: eligible ? '#d97706' : '#16a34a', fontWeight:600 }}>
+                      {eligible
+                        ? `→ ${eligible.tier}: ${eligible.label} statutory ceiling discount (${eligible.desc})`
+                        : `→ Not yet MTEP-eligible (${form.drugType==='small-molecule'?9:13}-year threshold)`}
+                    </div>
+                  )}
+                  <FieldErr msg={errors.yearsSinceApproval}/>
+                </div>
+
+                {/* Therapeutic Area */}
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>Therapeutic Area</label>
+                  <select value={form.therapeuticArea} onChange={e=>set('therapeuticArea',e.target.value)} style={sel(errors.therapeuticArea)}>
+                    <option value="">Select…</option>
+                    {THERAPEUTIC_AREAS.map(a=><option key={a} value={a}>{a}</option>)}
+                  </select>
+                  <FieldErr msg={errors.therapeuticArea}/>
+                </div>
+
+              </div>
+
+              <div style={{ marginTop:22, paddingTop:18, borderTop:'1px solid #f3f4f6', display:'flex', justifyContent:'flex-end' }}>
+                <button type="submit"
+                  style={{ background:'#0f1f42', color:'#fff', padding:'11px 30px', borderRadius:9, fontWeight:700, fontSize:13, border:'none', cursor:'pointer' }}
+                  onMouseOver={e=>e.target.style.background='#1a2e5a'}
+                  onMouseOut={e=>e.target.style.background='#0f1f42'}>
+                  Run Simulation →
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* ── RESULTS ── */}
+        {report && (
+          <div ref={reportRef} className="fade-up">
+
+            {/* Sub-header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18, flexWrap:'wrap', gap:12 }} className="no-print">
+              <div>
+                <h2 style={{ fontSize:18, fontWeight:800, color:'#0f172a', margin:'0 0 2px' }}>
+                  Simulation Results: <span style={{ color:'#0891b2' }}>{form.drugName}</span>
+                </h2>
+                <p style={{ fontSize:12, color:'#64748b', margin:0 }}>
+                  {form.therapeuticArea} · {form.drugType==='biologic'?'Biologic':'Small Molecule'} · {form.yearsSinceApproval} yrs post-approval · Generated {report.at.toLocaleString()}
+                </p>
+              </div>
+              <button onClick={()=>window.print()}
+                style={{ display:'flex', alignItems:'center', gap:7, background:'#fff', border:'1px solid #d1d5db', color:'#374151', padding:'9px 16px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}
+                onMouseOver={e=>e.currentTarget.style.background='#f9fafb'}
+                onMouseOut={e=>e.currentTarget.style.background='#fff'}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Export PDF
+              </button>
+            </div>
+
+            {/* ── SECTION 1: MFP DETERMINATION ── */}
+            <SectionCard number="1" title="MFP Price Determination" sub="Statutory discount ceiling based on MTEP eligibility and years post-approval">
+              {report.discountTier ? (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14 }}>
+                  <MetricCard label="Applicable Discount Tier" value={report.discountTier.tier}
+                    sub={report.discountTier.desc} accent="#0891b2" valueColor="#0891b2"/>
+                  <MetricCard label="Statutory Ceiling Discount" value={report.discountTier.label}
+                    sub="Max discount from non-FAMP (WAC proxy)" accent="#d97706" valueColor="#d97706"/>
+                  <MetricCard label="Current WAC" value={fmt(report.wac)} sub="Per dispensed unit" accent="#6366f1"/>
+                  <MetricCard label="MFP Ceiling (Statutory)" value={fmt(report.wac*(1-report.discountTier.pct/100))}
+                    sub={`${report.discountTier.label} discount from WAC`} accent="#16a34a" valueColor="#16a34a"/>
+                </div>
+              ) : (
+                <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, padding:16, display:'flex', gap:12, alignItems:'flex-start' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" style={{ flexShrink:0, marginTop:1 }}><polyline points="20 6 9 17 4 12"/></svg>
+                  <div>
+                    <div style={{ fontWeight:700, fontSize:14, color:'#15803d', marginBottom:4 }}>Not Yet MTEP Eligible</div>
+                    <div style={{ fontSize:13, color:'#16a34a', lineHeight:1.6 }}>
+                      {form.drugName||'This product'} has not yet reached the {form.drugType==='small-molecule'?9:13}-year MTEP threshold.
+                      No statutory discount tier applies. Revenue impact simulation requires MTEP eligibility.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* ── SECTION 2: REVENUE IMPACT ── */}
+            {report.scenarios && (
+              <SectionCard number="2" title="Annual Revenue Impact Summary" sub="Base case scenario (analyst estimate) vs. current pre-negotiation trajectory">
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:20 }}>
+                  <MetricCard label="Current Annual Medicare Revenue" value={fmtM(report.currentRev)}
+                    sub={`WAC × ${Number(form.annualUnits).toLocaleString()} units`} accent="#6366f1"/>
+                  <MetricCard label="Post-MFP Revenue (Base Case)" value={fmtM(report.baseRev)}
+                    sub="Analyst base case estimate" accent="#0891b2" valueColor="#0891b2"/>
+                  <MetricCard label="Annual Revenue Delta" value={fmtM(report.delta)}
+                    sub={`${pctFmt(report.deltaPct)} change`} accent="#dc2626" valueColor="#dc2626"/>
+                  <MetricCard label="5-Year Cumulative Impact" value={fmtM(-report.fiveYearImpact)}
+                    sub="With 2% annual volume growth" accent="#d97706" valueColor="#dc2626"/>
+                </div>
+
+                {/* Scenario comparison */}
+                <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>Scenario Comparison</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+                    {report.scenarios.map((s,i) => {
+                      const annualRev = s.mfp * report.units;
+                      const annualDelta = annualRev - report.currentRev;
+                      return (
+                        <div key={i} style={{ borderRadius:10, padding:16, background:s.bg, border:`1px solid ${s.border}` }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>{s.label}</div>
+                          <div style={{ marginBottom:6 }}>
+                            <div style={{ fontSize:10, color:'#9ca3af' }}>Discount from WAC</div>
+                            <div style={{ fontSize:18, fontWeight:800, color:s.color }}>{s.pct}%</div>
+                          </div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                            <div>
+                              <div style={{ fontSize:10, color:'#6b7280' }}>MFP / unit</div>
+                              <div style={{ fontSize:13, fontWeight:700, color:'#111827' }}>{fmt(s.mfp)}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize:10, color:'#6b7280' }}>Annual revenue</div>
+                              <div style={{ fontSize:13, fontWeight:700, color:'#111827' }}>{fmtM(annualRev)}</div>
+                            </div>
+                            <div style={{ gridColumn:'1/-1' }}>
+                              <div style={{ fontSize:10, color:'#6b7280' }}>Annual Δ from current</div>
+                              <div style={{ fontSize:13, fontWeight:700, color:s.color }}>{fmtM(annualDelta)} ({pctFmt((annualDelta/report.currentRev)*100)})</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </SectionCard>
+            )}
+
+            {/* ── SECTION 3: 5-YEAR TRAJECTORY ── */}
+            {report.scenarios && (
+              <SectionCard number="3" title="5-Year Revenue Trajectory" sub="Base case post-MFP revenue vs. pre-negotiation trajectory (2% annual volume growth assumed)">
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:20, border:'1px solid #f1f5f9' }}>
+                  <RevenueChart projection={report.projection} baseScenario={report.scenarios[1]}/>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10, marginTop:16 }}>
+                  {report.projection.slice(1).map((p,i) => {
+                    const delta = p.preMFP - p.postMFP;
+                    return (
+                      <div key={i} style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, padding:'10px 12px' }}>
+                        <div style={{ fontSize:10, color:'#9ca3af', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>Year {i+1}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:'#0891b2' }}>{fmtM(p.postMFP)}</div>
+                        <div style={{ fontSize:11, color:'#dc2626', marginTop:2 }}>−{fmtM(delta)} vs. no-MFP</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Footer */}
+            <div style={{ paddingTop:14, borderTop:'1px solid #e5e7eb', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8, fontSize:11, color:'#9ca3af', paddingBottom:20 }}>
+              <span>MarketAccess.ai CMS Outcome Simulator · For healthcare consulting and advisory use only</span>
+              <span>WAC used as non-FAMP proxy. Actual MFP subject to CMS negotiation. Not legal or actuarial advice.</span>
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

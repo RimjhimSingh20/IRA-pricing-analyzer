@@ -3,775 +3,328 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IRA Drug Price Negotiation Analyzer</title>
-  <meta name="description" content="CMS Medicare Drug Price Negotiation Risk Assessment — Inflation Reduction Act § 1191" />
+  <title>MarketAccess.ai — IRA Strategy Suite</title>
+  <meta name="description" content="Enterprise-grade IRA negotiation intelligence for healthcare market access teams. CMS drug price negotiation analytics built for consultants." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      safelist: [],
-      theme: {
-        extend: {
-          colors: {
-            navy: { 900: '#0a1628', 800: '#0f1f42', 700: '#1a2e5a', 600: '#1e3a6e' }
-          }
-        }
-      }
-    }
-  </script>
   <style>
-    * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    * { font-family: 'Inter', system-ui, sans-serif; }
 
-    .fade-up { animation: fadeUp 0.45s ease-out forwards; }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
+    .gradient-text {
+      background: linear-gradient(135deg, #ffffff 0%, #93c5fd 60%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    /* Smooth progress bar fill on report generation */
-    .bar-fill { transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
-
-    @media print {
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      @page { margin: 0.45in; size: letter portrait; }
-      body  { background: white !important; }
-      .no-print { display: none !important; }
-      .print-header { display: block !important; }
-      .report-wrap { display: block !important; }
+    .hero-bg {
+      background: #070f22;
+      background-image:
+        radial-gradient(ellipse 60% 50% at 15% 80%, rgba(37,99,235,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 85% 15%, rgba(124,58,237,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 60% 90%, rgba(8,145,178,0.10) 0%, transparent 70%);
     }
-    .print-header { display: none; }
+
+    .card-active {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+    .card-active:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+    }
+
+    .pill { display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:600; }
+
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    .grid-bg {
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
   </style>
 </head>
-<body class="bg-slate-50 antialiased min-h-screen">
+<body style="background:#f8fafc;margin:0;">
 
-<div id="root"></div>
+<!-- ── SUITE NAV ── -->
+<nav style="background:#070f22;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-family:Inter,system-ui;position:sticky;top:0;z-index:50;border-bottom:1px solid #1a2e5a;">
+  <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+    <div style="width:30px;height:30px;background:#2563eb;border-radius:7px;display:flex;align-items:center;justify-content:center;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <div style="line-height:1.1;">
+      <div style="color:white;font-weight:800;font-size:15px;letter-spacing:-0.01em;">MarketAccess.ai</div>
+      <div style="color:#60a5fa;font-size:10px;text-transform:uppercase;letter-spacing:0.07em;font-weight:600;">IRA Strategy Suite</div>
+    </div>
+  </a>
+  <div style="display:flex;gap:28px;align-items:center;">
+    <a href="index.html"         style="color:white;font-size:13px;font-weight:600;text-decoration:none;border-bottom:2px solid #2563eb;padding-bottom:2px;">Home</a>
+    <a href="analyzer.html"      style="color:#93c5fd;font-size:13px;font-weight:500;text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#93c5fd'">Risk Analyzer</a>
+    <a href="cms-simulator.html" style="color:#93c5fd;font-size:13px;font-weight:500;text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#93c5fd'">CMS Simulator</a>
+    <a href="#"                  style="color:#374151;font-size:13px;font-weight:500;text-decoration:none;pointer-events:none;">HEOR Dossier <span style="font-size:10px;background:#1e3a6e;color:#60a5fa;padding:2px 7px;border-radius:4px;margin-left:3px;font-weight:700;">Soon</span></a>
+  </div>
+</nav>
 
-<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- ── HERO ── -->
+<section class="hero-bg grid-bg" style="padding:80px 24px 90px;">
+  <div style="max-width:1100px;margin:0 auto;text-align:center;">
+    <div class="pill" style="background:rgba(37,99,235,0.15);color:#93c5fd;border:1px solid rgba(37,99,235,0.3);margin-bottom:28px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Updated for IRA 2026 Drug Selection Cycle
+    </div>
 
-<script type="text/babel">
+    <h1 style="font-size:clamp(32px,5vw,58px);font-weight:900;line-height:1.1;letter-spacing:-0.02em;margin-bottom:22px;">
+      <span class="gradient-text">IRA Drug Price Negotiation<br/>Intelligence Platform</span>
+    </h1>
 
-const { useState, useRef } = React;
+    <p style="color:#94a3b8;font-size:clamp(15px,2vw,18px);max-width:620px;margin:0 auto 40px;line-height:1.7;font-weight:400;">
+      Purpose-built analytics for healthcare market access teams navigating CMS drug selection, MFP modeling, and payer strategy under the Inflation Reduction Act.
+    </p>
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+    <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+      <a href="analyzer.html" style="background:#2563eb;color:white;padding:13px 28px;border-radius:9px;font-weight:700;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:background 0.15s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+        Open Risk Analyzer
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      <a href="cms-simulator.html" style="background:rgba(255,255,255,0.07);color:white;padding:13px 28px;border-radius:9px;font-weight:600;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,0.15);display:inline-flex;align-items:center;gap:8px;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
+        CMS Outcome Simulator
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+    </div>
 
-const THERAPEUTIC_AREAS = ['Oncology','Cardiology','Rare Disease','Diabetes','Neurology','Other'];
-const SPEND_OPTIONS     = ['<$200M','$200M–$500M','$500M–$1B','>$1B'];
-const UNMET_OPTIONS     = ['High','Moderate','Low'];
-
-const INITIAL_FORM = {
-  drugName:'', therapeuticArea:'', drugType:'small-molecule',
-  yearsSinceApproval:'', numIndications:'', hasCompetition:'no',
-  medicareSpend:'', unmetNeed:'', orphanDrug:'no', reviewDivision:'CDER',
-};
-
-// ─── SCORING ENGINE ───────────────────────────────────────────────────────────
-
-function calcScore(d) {
-  const factors = [];
-  let total = 0;
-
-  // 1. Medicare Part D Spend (0–35 pts)
-  const spendPts = {'<$200M':8,'$200M–$500M':18,'$500M–$1B':27,'>$1B':35}[d.medicareSpend] ?? 0;
-  total += spendPts;
-  factors.push({ label:'Medicare Part D Spend', pts:spendPts, max:35,
-    note:`${d.medicareSpend} annual Part D expenditure — the primary IRA selection criterion` });
-
-  // 2. Market Exclusivity (0–25 pts)
-  const exclPts = d.hasCompetition === 'no' ? 25 : 2;
-  total += exclPts;
-  factors.push({ label:'Market Exclusivity', pts:exclPts, max:25,
-    note: d.hasCompetition === 'no'
-      ? 'Single-source product with no approved generic or biosimilar alternatives'
-      : 'Generic or biosimilar competition reduces IRA selection priority' });
-
-  // 3. MTEP Eligibility Window (0–20 pts)
-  const threshold = d.drugType === 'small-molecule' ? 9 : 13;
-  const yrs = parseInt(d.yearsSinceApproval) || 0;
-  const over = yrs - threshold;
-  let mtepPts = 0, mtepNote = '';
-  if (over < 0)      { mtepPts=0;  mtepNote=`Not yet MTEP-eligible; ${Math.abs(over)} yr(s) until the ${threshold}-year window opens`; }
-  else if (over===0) { mtepPts=12; mtepNote='Crossed MTEP threshold this year — immediate selection exposure'; }
-  else if (over<=3)  { mtepPts=16; mtepNote=`${over} yr(s) past eligibility threshold; within active CMS negotiation window`; }
-  else               { mtepPts=20; mtepNote=`${over} years beyond MTEP threshold; long-established negotiation eligibility`; }
-  total += mtepPts;
-  factors.push({ label:'MTEP Eligibility Status', pts:mtepPts, max:20, note:mtepNote });
-
-  // 4. Indication Breadth (0–10 pts)
-  const ind = parseInt(d.numIndications) || 1;
-  const indPts = ind===1 ? 3 : ind<=3 ? 6 : 10;
-  total += indPts;
-  factors.push({ label:'Indication Breadth', pts:indPts, max:10,
-    note:`${ind} approved indication${ind!==1?'s':''} — broader Medicare utilization increases negotiation scope` });
-
-  // 5. Orphan Drug Modifier (0 to –8)
-  const orphMod = d.orphanDrug === 'yes' ? -8 : 0;
-  total += orphMod;
-  factors.push({ label:'Orphan Drug Designation', pts:orphMod, max:8, modifier:true,
-    note: d.orphanDrug==='yes'
-      ? 'Single-indication orphan drugs may qualify for exemption under IRA § 1192(c)(3)'
-      : 'No orphan exemption applicable — full negotiation exposure' });
-
-  // 6. Unmet Medical Need Modifier (–5 to +5)
-  const unmetMod = {High:-5,Moderate:0,Low:5}[d.unmetNeed] ?? 0;
-  total += unmetMod;
-  factors.push({ label:'Unmet Medical Need', pts:unmetMod, max:5, modifier:true,
-    note: d.unmetNeed==='High'
-      ? 'High unmet need provides partial political insulation during the public comment phase'
-      : d.unmetNeed==='Low'
-      ? 'Mature indication with available alternatives increases CMS selection motivation'
-      : 'Moderate unmet need — neutral influence on selection probability' });
-
-  return { total: Math.max(0, Math.min(100, Math.round(total))), factors };
-}
-
-function getRisk(s) {
-  if (s < 40) return { label:'Low Risk',      hex:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0', text:'#15803d' };
-  if (s <= 70) return { label:'Moderate Risk', hex:'#d97706', bg:'#fffbeb', border:'#fde68a', text:'#b45309' };
-  return           { label:'High Risk',        hex:'#dc2626', bg:'#fef2f2', border:'#fecaca', text:'#b91c1c' };
-}
-
-function getMTEP(d) {
-  const threshold = d.drugType === 'small-molecule' ? 9 : 13;
-  const yrs = parseInt(d.yearsSinceApproval) || 0;
-  return {
-    eligible: yrs >= threshold, threshold, yrs,
-    yearsRemaining: Math.max(0, threshold - yrs),
-    typeLabel: d.drugType === 'small-molecule' ? 'Small Molecule' : 'Biologic',
-  };
-}
-
-// ─── CONTENT GENERATION ───────────────────────────────────────────────────────
-
-function genRecs(d, score) {
-  const recs = [];
-  const yrs = parseInt(d.yearsSinceApproval) || 0;
-  const threshold = d.drugType === 'small-molecule' ? 9 : 13;
-  const eligible = yrs >= threshold;
-  const name = d.drugName || 'This product';
-
-  if (score.total > 70) recs.push({ p:'Critical', c:'red',
-    t:`Initiate IRA negotiation preparation protocol immediately. With a composite risk score of ${score.total}/100, ${name} faces elevated selection probability in the next CMS drug selection cycle. Engage regulatory counsel and health economics teams now to build negotiation readiness.` });
-
-  if (d.medicareSpend === '>$1B' || d.medicareSpend === '$500M–$1B') recs.push({ p:'High', c:'orange',
-    t:`Develop a Maximum Fair Price (MFP) modeling framework without delay. Products in the top Medicare Part D spend tier are statistically most likely to be selected. Proactive MFP scenario analysis — including the 25%, 35%, 60%, and 65% discount threshold scenarios — should begin 18–24 months before anticipated selection.` });
-
-  if (d.hasCompetition === 'no' && eligible) recs.push({ p:'High', c:'orange',
-    t:`Accelerate competitive entry strategic planning. As a single-source ${d.drugType==='biologic'?'biologic':'small molecule'} past the MTEP threshold, the absence of competition is a primary negotiation risk driver. Evaluate authorized generic strategies, indication-licensed partnerships, or accelerated patent settlement structures to modify the competitive landscape before selection.` });
-
-  if (parseInt(d.numIndications) > 3) recs.push({ p:'Medium', c:'amber',
-    t:`Implement indication-specific pricing architecture. With multiple approved indications, explore outcomes-based contracting arrangements that reflect differential clinical value across patient populations. This approach may mitigate blended price pressure while preserving value in the highest-priority indications.` });
-
-  if (d.orphanDrug === 'yes') recs.push({ p:'Medium', c:'amber',
-    t:`Leverage orphan drug designation proactively in CMS engagement strategy. Confirm the product qualifies under the single-indication exemption criteria under § 1192(c)(3), ensure all designation documentation is current, and maintain detailed indication-specific utilization data to support exemption arguments during the Initial Offer phase.` });
-
-  if (d.drugType === 'biologic' && !eligible) recs.push({ p:'Medium', c:'amber',
-    t:`Optimize the BPCIA exclusivity runway. With ${threshold-yrs} year(s) before MTEP eligibility, use this window to file reference product exclusivity (RPE) protections, build real-world evidence packages, and establish outcomes-based payer relationships that will anchor the post-negotiation commercial strategy.` });
-
-  if (!eligible && d.drugType === 'small-molecule') recs.push({ p:'Medium', c:'amber',
-    t:`Establish MTEP eligibility timeline planning. ${name} reaches the ${threshold}-year threshold in approximately ${threshold-yrs} year(s). Use this window proactively to build comparative effectiveness data, cost-effectiveness models, and payer relationships that will anchor future MFP negotiation positioning.` });
-
-  if (d.therapeuticArea === 'Oncology') recs.push({ p:'Ongoing', c:'blue',
-    t:`Engage oncology patient advocacy networks in CMS process participation. Cancer drug negotiations attract significant advocacy attention. Cultivate relationships with organizations such as the American Cancer Society CAN and disease-specific foundations to build a coalition that can provide testimony and public comment support during the negotiation process.` });
-
-  if (d.therapeuticArea === 'Rare Disease') recs.push({ p:'Ongoing', c:'blue',
-    t:`Invest in patient registry and natural history documentation. For rare disease products, real-world evidence collected through patient registries is a critical asset in CMS negotiations, supporting both the clinical value argument and, where applicable, orphan drug exemption claims.` });
-
-  recs.push({ p:'Ongoing', c:'blue',
-    t:`Build and maintain an HTA-grade payer value dossier. Regardless of near-term IRA risk, invest in a comprehensive evidence package — AMCP Dossier format, cost-effectiveness modeling, and budget impact analysis — demonstrating clinical and economic value across Medicare, Medicaid, and commercial payer segments.` });
-
-  return recs;
-}
-
-function genPayer(d) {
-  const meta = {
-    '<$200M':    { level:'Low',       impact:'low',       desc:'Manageable Medicare exposure with limited CMS visibility. Product is unlikely to appear in near-term selection cycles based on spend alone.' },
-    '$200M–$500M':{ level:'Moderate',  impact:'moderate',  desc:'Meaningful Part D expenditure places this product on CMS monitoring lists. Selection risk materializes when combined with other eligibility factors.' },
-    '$500M–$1B': { level:'High',      impact:'high',      desc:'Significant Part D spend positions this product as a top-tier CMS candidate. Has likely appeared in annual MedPAC and CMS spending reports.' },
-    '>$1B':      { level:'Very High', impact:'very-high', desc:'Blockbuster Medicare spend — among the highest in the Part D formulary. Represents a primary CMS savings target under the IRA mandate.' },
-  };
-  const spend = meta[d.medicareSpend] ?? meta['<$200M'];
-
-  const medicaidNote = d.therapeuticArea === 'Diabetes'
-    ? 'Significant dual-eligible population creates substantial Medicaid exposure. Best Price provisions mean any MFP negotiated under the IRA will directly compress Medicaid net pricing across all state programs.'
-    : (d.therapeuticArea === 'Oncology' || d.therapeuticArea === 'Rare Disease')
-    ? 'Relatively limited Medicaid exposure typical for this therapeutic area. Primary risk concentration remains in Medicare Part D.'
-    : 'Monitor Medicaid Best Price implications carefully. MFP-level prices negotiated under IRA may trigger rebate recalculations, creating spillover pricing compression across state formularies.';
-
-  const commercialNote = d.hasCompetition === 'yes'
-    ? 'Commercial payer leverage already constrained by existing generic or biosimilar alternatives. Focus commercial contracting on formulary tier positioning, patient support programs, and outcomes-based value arrangements.'
-    : 'Single-source status currently preserves commercial pricing power, but IRA negotiation precedent may embolden commercial PBMs to demand price parity or reference-price arrangements tied to the established MFP.';
-
-  return { spend, medicaidNote, commercialNote };
-}
-
-function genComp(d) {
-  const biosim = d.hasCompetition === 'yes'
-    ? { level:'Active',   c:'red',    desc:'Generic or biosimilar competition is actively shaping market dynamics. Focus resources on differentiation through patient support programs, formulation innovation, and indication-specific HTA evidence to justify formulary preference.' }
-    : d.drugType === 'biologic'
-    ? { level:'Emerging', c:'amber',  desc:'No current biosimilar competition, but the BPCIA 12-year exclusivity runway should be monitored closely. Track biosimilar development pipeline activity through FDA Purple Book quarterly updates and IND disclosures.' }
-    : { level:'Latent',   c:'yellow', desc:'No current generic competition, but ANDA filing activity may be approaching. Evaluate the extended patent estate, Paragraph IV challenge history, and potential 505(b)(2) extension opportunities.' };
-
-  const taPress = {
-    'Oncology':     'Highly competitive therapeutic landscape with rapid IO checkpoint inhibitor, ADC, and targeted therapy approvals. NCCN Compendium guideline positioning is mission-critical for formulary access. Biomarker-driven patient selection and real-world evidence are key differentiators in payer negotiations.',
-    'Cardiology':   'Established therapeutic classes with significant generic penetration. Premium positioning requires demonstrable superiority data vs. standard-of-care agents. CVOT data and HF outcomes studies are the primary levers for commercial and government payer contracting.',
-    'Rare Disease': 'Limited direct competition in most rare disease indications creates favorable formulary dynamics. Differentiation is sustained through patient identification programs, genetic testing partnerships, biomarker-validated selection, and compassionate use network development.',
-    'Diabetes':     'Intensely competitive with multiple established mechanism classes (SGLT2i, GLP-1 RA, DPP-4i, basal insulin). GLP-1 dominance requires robust CVOT data and head-to-head evidence to sustain a premium pricing position with major PBMs.',
-    'Neurology':    'High pipeline activity with elevated clinical trial failure rates creates significant uncertainty. Biomarker validation, patient selection precision, and clear mechanism-of-action differentiation are foundational to sustaining a premium pricing justification.',
-    'Other':        'Evaluate the competitive landscape at the indication level. Clinical differentiation data, validated biomarkers, and health economic modeling are foundational requirements for sustained payer negotiation leverage.',
-  };
-
-  const diffOpps = d.orphanDrug === 'yes'
-    ? ['Orphan designation and small addressable population directly supports a premium unit pricing model', 'Disease registry-based real-world evidence strengthens outcomes-based contracting proposals with payers', 'Patient advocacy organization partnerships amplify clinical narrative and can provide CMS public comment support']
-    : d.unmetNeed === 'High'
-    ? ['High unmet need clinical profile supports a value-based pricing premium with HTA justification', 'Develop an outcomes-based contracting framework with major PBMs tied to validated clinical endpoints', 'Invest in burden-of-illness modeling to quantify total cost-of-care reduction for payers and employers']
-    : ['Differentiate through superior safety, tolerability, or convenience vs. existing alternatives', 'Patient support programs and hub services demonstrate real-world value beyond the clinical trial setting', 'Outcomes-based contracting tied to measurable real-world endpoints can offset formulary discount demands'];
-
-  return { biosim, taPress: taPress[d.therapeuticArea] ?? taPress['Other'], diffOpps };
-}
-
-// ─── UI COMPONENTS ────────────────────────────────────────────────────────────
-
-function RiskGauge({ score }) {
-  const risk = getRisk(score);
-  const r = 68, circ = Math.PI * r;
-  const filled = (score / 100) * circ;
-  return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-      <svg width="184" height="110" viewBox="0 0 184 110" role="img" aria-label={`Risk score ${score} out of 100`}>
-        <path d={`M 24 94 A ${r} ${r} 0 0 0 160 94`} fill="none" stroke="#e5e7eb" strokeWidth="13" strokeLinecap="round"/>
-        <path d={`M 24 94 A ${r} ${r} 0 0 0 160 94`} fill="none" stroke={risk.hex} strokeWidth="13"
-          strokeLinecap="round" strokeDasharray={`${filled} ${circ}`} strokeDashoffset="0"/>
-        <text x="92" y="83" textAnchor="middle" fontSize="38" fontWeight="800" fill={risk.hex} fontFamily="Inter,system-ui">{score}</text>
-        <text x="92" y="102" textAnchor="middle" fontSize="11" fill="#9ca3af" fontFamily="Inter,system-ui">/ 100</text>
-      </svg>
-      <span style={{ backgroundColor:risk.hex, color:'white', padding:'3px 16px', borderRadius:9999, fontSize:13, fontWeight:700, marginTop:4 }}>
-        {risk.label}
-      </span>
-      <div style={{ display:'flex', gap:12, marginTop:10, fontSize:11, color:'#9ca3af' }}>
-        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#16a34a',marginRight:4}}/>0–39 Low</span>
-        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#d97706',marginRight:4}}/>40–70 Moderate</span>
-        <span><span style={{display:'inline-block',width:8,height:8,borderRadius:999,background:'#dc2626',marginRight:4}}/>71+ High</span>
+    <!-- Stats row -->
+    <div style="display:flex;gap:40px;justify-content:center;margin-top:64px;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:white;letter-spacing:-0.02em;">6</div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px;font-weight:500;">Scoring dimensions</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:white;letter-spacing:-0.02em;">3</div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px;font-weight:500;">Integrated tools</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:white;letter-spacing:-0.02em;">IRA §1191</div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px;font-weight:500;">Statutory framework</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:white;letter-spacing:-0.02em;">PDF</div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px;font-weight:500;">Export ready</div>
       </div>
     </div>
-  );
-}
+  </div>
+</section>
 
-function FactorBar({ label, pts, max, modifier, note }) {
-  const isNeg = pts < 0;
-  const abs = Math.abs(pts);
-  const pct = max > 0 ? (abs / max) * 100 : 0;
-  const barColor = modifier
-    ? (isNeg ? '#16a34a' : pts > 0 ? '#dc2626' : '#9ca3af')
-    : (pct > 66 ? '#dc2626' : pct > 33 ? '#d97706' : '#16a34a');
-  return (
-    <div style={{ paddingTop:10, paddingBottom:10, borderBottom:'1px solid #f3f4f6' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-        <span style={{ fontSize:13, fontWeight:500, color:'#374151' }}>{label}</span>
-        <span style={{ fontSize:13, fontWeight:700, color:barColor, fontVariantNumeric:'tabular-nums' }}>
-          {isNeg ? '−' : '+'}{abs}<span style={{color:'#d1d5db',fontWeight:400}}> / {modifier ? `±${max||8}` : max}</span>
-        </span>
-      </div>
-      {max > 0 && (
-        <div style={{ height:5, background:'#f3f4f6', borderRadius:999, marginBottom:5, overflow:'hidden' }}>
-          <div className="bar-fill" style={{ width:`${pct}%`, height:'100%', background:barColor, borderRadius:999 }}/>
+<!-- ── TOOLS GRID ── -->
+<section style="padding:80px 24px;background:#f8fafc;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:52px;">
+      <div style="font-size:12px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Platform Tools</div>
+      <h2 style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-0.02em;margin-bottom:12px;">Three tools. One strategy suite.</h2>
+      <p style="font-size:15px;color:#64748b;max-width:500px;margin:0 auto;line-height:1.7;">Each tool addresses a distinct phase of the IRA negotiation preparation lifecycle.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
+
+      <!-- Card 1: Risk Analyzer -->
+      <a href="analyzer.html" style="text-decoration:none;" class="card-active">
+        <div style="background:white;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;height:100%;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+          <div style="height:4px;background:linear-gradient(90deg,#2563eb,#3b82f6);"></div>
+          <div style="padding:28px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+              <div style="width:44px;height:44px;background:#eff6ff;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                  <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+              </div>
+              <span class="pill" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;">Active</span>
+            </div>
+            <h3 style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:8px;">IRA Negotiation Risk Analyzer</h3>
+            <p style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:22px;">Assess your product's CMS drug selection probability with a 6-factor weighted risk model. Includes MTEP eligibility assessment, market access strategy recommendations, and payer landscape analysis. Export-ready PDF report.</p>
+            <div style="display:flex;align-items:center;gap:6px;color:#2563eb;font-size:13px;font-weight:700;">
+              Open Analyzer
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
         </div>
-      )}
-      <p style={{ fontSize:11, color:'#6b7280', lineHeight:1.5 }}>{note}</p>
-    </div>
-  );
-}
+      </a>
 
-const BADGE = {
-  Critical:{ bg:'#fee2e2', color:'#b91c1c', border:'#fecaca' },
-  High:    { bg:'#ffedd5', color:'#c2410c', border:'#fed7aa' },
-  Medium:  { bg:'#fef9c3', color:'#a16207', border:'#fde68a' },
-  Ongoing: { bg:'#dbeafe', color:'#1d4ed8', border:'#bfdbfe' },
-};
-function PBadge({ p }) {
-  const s = BADGE[p] ?? { bg:'#f3f4f6', color:'#374151', border:'#e5e7eb' };
-  return <span style={{ flexShrink:0, display:'inline-block', padding:'2px 10px', borderRadius:5, fontSize:11, fontWeight:700, background:s.bg, color:s.color, border:`1px solid ${s.border}` }}>{p}</span>;
-}
+      <!-- Card 2: CMS Simulator -->
+      <a href="cms-simulator.html" style="text-decoration:none;" class="card-active">
+        <div style="background:white;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;height:100%;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+          <div style="height:4px;background:linear-gradient(90deg,#0891b2,#06b6d4);"></div>
+          <div style="padding:28px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+              <div style="width:44px;height:44px;background:#ecfeff;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>
+                  <path d="M7 8h.01M7 12h.01M12 8h5M12 12h5"/>
+                </svg>
+              </div>
+              <span class="pill" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;">Active</span>
+            </div>
+            <h3 style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:8px;">CMS Outcome Simulator</h3>
+            <p style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:22px;">Model the financial impact of IRA negotiation across statutory discount tiers. Simulate MFP price scenarios, 5-year revenue trajectories, and multi-scenario revenue waterfall analysis based on WAC and Medicare utilization inputs.</p>
+            <div style="display:flex;align-items:center;gap:6px;color:#0891b2;font-size:13px;font-weight:700;">
+              Open Simulator
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+      </a>
 
-function Toggle({ options, value, onChange }) {
-  return (
-    <div style={{ display:'flex', border:'1px solid #d1d5db', borderRadius:8, overflow:'hidden' }}>
-      {options.map(o => (
-        <button key={o.v} type="button" onClick={() => onChange(o.v)}
-          style={{ flex:1, padding:'9px 8px', fontSize:13, fontWeight:500, border:'none', cursor:'pointer', transition:'background 0.15s',
-            background: value===o.v ? '#0f1f42' : '#fff',
-            color:      value===o.v ? '#fff'    : '#4b5563',
-          }}>
-          {o.l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SectionCard({ number, title, sub, children }) {
-  return (
-    <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.07)' }}>
-      <div style={{ background:'#0f1f42', padding:'12px 24px', display:'flex', alignItems:'center', gap:12 }}>
-        <span style={{ width:24, height:24, borderRadius:999, background:'rgba(255,255,255,0.2)', color:'#fff', fontSize:12, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{number}</span>
-        <div>
-          <div style={{ color:'#fff', fontWeight:700, fontSize:13, letterSpacing:'0.05em', textTransform:'uppercase' }}>{title}</div>
-          {sub && <div style={{ color:'#93c5fd', fontSize:11, marginTop:1 }}>{sub}</div>}
+      <!-- Card 3: HEOR Dossier (Coming Soon) -->
+      <div style="opacity:0.7;">
+        <div style="background:white;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;height:100%;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+          <div style="height:4px;background:linear-gradient(90deg,#7c3aed,#a78bfa);opacity:0.5;"></div>
+          <div style="padding:28px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+              <div style="width:44px;height:44px;background:#f5f3ff;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" opacity="0.6">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                </svg>
+              </div>
+              <span class="pill" style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;">Coming Soon</span>
+            </div>
+            <h3 style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:8px;">HEOR Value Dossier Generator</h3>
+            <p style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:22px;">Generate structured health economic and outcomes research evidence packages for CMS and commercial payer negotiations. AMCP-format dossier scaffolding, cost-effectiveness model inputs, and budget impact analysis templates.</p>
+            <div style="display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:13px;font-weight:600;cursor:default;">
+              In Development
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
         </div>
       </div>
-      <div style={{ padding:24 }}>{children}</div>
+
     </div>
-  );
-}
+  </div>
+</section>
 
-function MetricCard({ label, value, sub, valueColor }) {
-  return (
-    <div style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:10, padding:16, boxShadow:'0 1px 2px rgba(0,0,0,0.05)' }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize:19, fontWeight:800, color: valueColor || '#111827', lineHeight:1.2 }}>{value}</div>
-      {sub && <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function FieldErr({ msg }) {
-  return msg ? <div style={{ color:'#ef4444', fontSize:11, marginTop:4 }}>{msg}</div> : null;
-}
-
-function Label({ children }) {
-  return <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>{children}</label>;
-}
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-
-function App() {
-  const [form, setForm]     = useState(INITIAL_FORM);
-  const [report, setReport] = useState(null);
-  const [errors, setErrors] = useState({});
-  const reportRef = useRef(null);
-
-  const set = (k, v) => {
-    setForm(p => ({ ...p, [k]: v }));
-    setErrors(p => ({ ...p, [k]: null }));
-  };
-
-  const validate = () => {
-    const e = {};
-    if (!form.drugName.trim())         e.drugName = 'Drug name is required';
-    if (!form.therapeuticArea)         e.therapeuticArea = 'Please select a therapeutic area';
-    if (form.yearsSinceApproval==='' || isNaN(form.yearsSinceApproval) || Number(form.yearsSinceApproval)<0)
-      e.yearsSinceApproval = 'Enter a valid number of years (≥ 0)';
-    if (!form.numIndications || isNaN(form.numIndications) || Number(form.numIndications)<1)
-      e.numIndications = 'Enter the number of approved indications (≥ 1)';
-    if (!form.medicareSpend) e.medicareSpend = 'Please select a Medicare spend range';
-    if (!form.unmetNeed)     e.unmetNeed     = 'Please select unmet need level';
-    return e;
-  };
-
-  const handleGenerate = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    const score = calcScore(form);
-    setReport({
-      score, mtep: getMTEP(form),
-      recs: genRecs(form, score),
-      payer: genPayer(form),
-      comp: genComp(form),
-      at: new Date(),
-    });
-    setTimeout(() => reportRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 80);
-  };
-
-  const risk = report ? getRisk(report.score.total) : null;
-
-  const spendBadge = {
-    low:       { bg:'#dcfce7', color:'#15803d' },
-    moderate:  { bg:'#fef9c3', color:'#a16207' },
-    high:      { bg:'#ffedd5', color:'#c2410c' },
-    'very-high':{ bg:'#fee2e2', color:'#b91c1c' },
-  };
-  const biosimColor = { Active:'#b91c1c', Emerging:'#b45309', Latent:'#a16207' };
-  const biosimBg    = { Active:'#fee2e2', Emerging:'#fef9c3', Latent:'#fef9c3' };
-
-  // ── inline styles for reuse
-  const inp = (err) => ({
-    width:'100%', borderRadius:8, border:`1px solid ${err?'#f87171':'#d1d5db'}`,
-    padding:'10px 14px', fontSize:13, outline:'none', boxSizing:'border-box',
-    background: err ? '#fef2f2' : '#fff',
-    fontFamily:'inherit',
-  });
-  const sel = (err) => ({ ...inp(err), background: err ? '#fef2f2' : '#fff' });
-
-  return (
-    <div style={{ minHeight:'100vh', background:'#f8fafc' }}>
-
-      {/* ── HEADER ── */}
-      <header className="no-print" style={{ background:'#0f1f42', padding:'14px 0' }}>
-        <div style={{ maxWidth:1200, margin:'0 auto', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-            <div style={{ width:40, height:40, background:'#3b82f6', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="#fff" strokeWidth="2">
-                <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-              </svg>
+<!-- ── METHODOLOGY ── -->
+<section style="padding:72px 24px;background:white;border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Methodology</div>
+        <h2 style="font-size:28px;font-weight:800;color:#0f172a;letter-spacing:-0.02em;margin-bottom:16px;line-height:1.25;">Built on the IRA statutory framework</h2>
+        <p style="font-size:14px;color:#64748b;line-height:1.8;margin-bottom:24px;">
+          All scoring models are derived directly from IRA § 1191–1198 eligibility criteria, CMS guidance documents, and established healthcare market access consulting methodology.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div class="feature-icon" style="background:#eff6ff;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
             <div>
-              <div style={{ color:'#fff', fontWeight:800, fontSize:17, lineHeight:1 }}>IRA Drug Price Negotiation Analyzer</div>
-              <div style={{ color:'#93c5fd', fontSize:11, marginTop:3, letterSpacing:'0.06em', textTransform:'uppercase' }}>Medicare Drug Price Negotiation Program · IRA § 1191</div>
+              <div style="font-size:14px;font-weight:600;color:#0f172a;margin-bottom:2px;">MTEP clock modeling</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.6;">9-year (small molecule) and 13-year (biologic) eligibility thresholds per § 1192(d)</div>
             </div>
           </div>
-          <div style={{ textAlign:'right', display:'none' }} className="sm:block">
-            <div style={{ color:'#bfdbfe', fontSize:11, fontWeight:500 }}>Inflation Reduction Act of 2022</div>
-            <div style={{ color:'#60a5fa', fontSize:11 }}>CMS Negotiation Risk Intelligence</div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── PRINT HEADER ── */}
-      <div className="print-header" style={{ borderBottom:'4px solid #0f1f42', paddingBottom:16, marginBottom:24 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-          <div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#0f1f42' }}>IRA Drug Price Negotiation Analyzer</div>
-            <div style={{ fontSize:12, color:'#6b7280', marginTop:2 }}>Medicare Drug Price Negotiation Program · IRA § 1191 · Consulting Intelligence Report</div>
-          </div>
-          <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:11, color:'#9ca3af' }}>Report generated</div>
-            <div style={{ fontSize:12, fontWeight:600, color:'#374151' }}>
-              {report?.at.toLocaleDateString('en-US',{ year:'numeric', month:'long', day:'numeric' })}
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div class="feature-icon" style="background:#ecfeff;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             </div>
-            <div style={{ marginTop:4, fontSize:10, fontWeight:700, color:'#0f1f42', border:'1px solid #0f1f42', padding:'2px 8px', display:'inline-block', letterSpacing:'0.1em' }}>CONFIDENTIAL</div>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#0f172a;margin-bottom:2px;">Statutory discount tier mapping</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.6;">25%, 35%, and 60% MFP ceilings based on non-FAMP, modeled from WAC proxy</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div class="feature-icon" style="background:#fdf4ff;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#0f172a;margin-bottom:2px;">Multi-stakeholder payer analysis</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.6;">Medicare Part D, Medicaid Best Price, and commercial spillover implications modeled together</div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth:1200, margin:'0 auto', padding:'32px 24px' }}>
-
-        {/* ── FORM ── */}
-        <div className="no-print" style={{ marginBottom:40 }}>
-          <h1 style={{ fontSize:24, fontWeight:800, color:'#111827', marginBottom:4 }}>Drug Profile Assessment</h1>
-          <p style={{ fontSize:13, color:'#6b7280' }}>Complete the product profile below to generate a comprehensive IRA negotiation risk and market access analysis.</p>
-
-          <form onSubmit={handleGenerate} noValidate style={{ marginTop:20 }}>
-            <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:28, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px,1fr))', gap:'20px 32px' }}>
-
-                {/* Drug Name (full width) */}
-                <div style={{ gridColumn:'1/-1' }}>
-                  <Label>Drug Name / Brand Name</Label>
-                  <input type="text" value={form.drugName} onChange={e=>set('drugName',e.target.value)}
-                    placeholder="e.g., Eliquis, Keytruda, Jardiance, Ozempic" style={inp(errors.drugName)}
-                    onFocus={e=>e.target.style.boxShadow='0 0 0 3px rgba(59,130,246,0.25)'}
-                    onBlur={e=>e.target.style.boxShadow='none'} />
-                  <FieldErr msg={errors.drugName}/>
-                </div>
-
-                {/* Therapeutic Area */}
-                <div>
-                  <Label>Therapeutic Area</Label>
-                  <select value={form.therapeuticArea} onChange={e=>set('therapeuticArea',e.target.value)} style={sel(errors.therapeuticArea)}>
-                    <option value="">Select therapeutic area…</option>
-                    {THERAPEUTIC_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                  <FieldErr msg={errors.therapeuticArea}/>
-                </div>
-
-                {/* Drug Type */}
-                <div>
-                  <Label>Drug Type</Label>
-                  <Toggle value={form.drugType} onChange={v=>set('drugType',v)}
-                    options={[{v:'small-molecule',l:'Small Molecule'},{v:'biologic',l:'Biologic / Large Molecule'}]}/>
-                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:5 }}>
-                    MTEP eligibility threshold: <strong>{form.drugType==='small-molecule'?'9 years':'13 years'}</strong> post-FDA approval
-                  </div>
-                </div>
-
-                {/* Years */}
-                <div>
-                  <Label>Years Since FDA Approval</Label>
-                  <input type="number" min="0" max="60" value={form.yearsSinceApproval}
-                    onChange={e=>set('yearsSinceApproval',e.target.value)} placeholder="e.g., 7" style={inp(errors.yearsSinceApproval)}
-                    onFocus={e=>e.target.style.boxShadow='0 0 0 3px rgba(59,130,246,0.25)'}
-                    onBlur={e=>e.target.style.boxShadow='none'}/>
-                  <FieldErr msg={errors.yearsSinceApproval}/>
-                </div>
-
-                {/* Indications */}
-                <div>
-                  <Label>Number of Approved Indications</Label>
-                  <input type="number" min="1" max="30" value={form.numIndications}
-                    onChange={e=>set('numIndications',e.target.value)} placeholder="e.g., 3" style={inp(errors.numIndications)}
-                    onFocus={e=>e.target.style.boxShadow='0 0 0 3px rgba(59,130,246,0.25)'}
-                    onBlur={e=>e.target.style.boxShadow='none'}/>
-                  <FieldErr msg={errors.numIndications}/>
-                </div>
-
-                {/* Competition */}
-                <div>
-                  <Label>Generic / Biosimilar Competition</Label>
-                  <Toggle value={form.hasCompetition} onChange={v=>set('hasCompetition',v)}
-                    options={[{v:'no',l:'No Competition'},{v:'yes',l:'Competition Exists'}]}/>
-                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:5 }}>Single-source drugs face significantly higher IRA selection risk</div>
-                </div>
-
-                {/* Medicare Spend */}
-                <div>
-                  <Label>Estimated Medicare Part D Spend</Label>
-                  <select value={form.medicareSpend} onChange={e=>set('medicareSpend',e.target.value)} style={sel(errors.medicareSpend)}>
-                    <option value="">Select annual spend range…</option>
-                    {SPEND_OPTIONS.map(o => <option key={o} value={o}>{o} per year</option>)}
-                  </select>
-                  <FieldErr msg={errors.medicareSpend}/>
-                </div>
-
-                {/* Unmet Need */}
-                <div>
-                  <Label>Unmet Medical Need Level</Label>
-                  <Toggle value={form.unmetNeed} onChange={v=>set('unmetNeed',v)}
-                    options={UNMET_OPTIONS.map(o=>({v:o,l:o}))}/>
-                  <FieldErr msg={errors.unmetNeed}/>
-                </div>
-
-                {/* Orphan Drug */}
-                <div>
-                  <Label>Orphan Drug Designation</Label>
-                  <Toggle value={form.orphanDrug} onChange={v=>set('orphanDrug',v)}
-                    options={[{v:'no',l:'Not Designated'},{v:'yes',l:'Orphan Designated'}]}/>
-                </div>
-
-                {/* FDA Division */}
-                <div>
-                  <Label>FDA Review Division</Label>
-                  <Toggle value={form.reviewDivision} onChange={v=>set('reviewDivision',v)}
-                    options={[{v:'CDER',l:'CDER — Drugs'},{v:'CBER',l:'CBER — Biologics'}]}/>
-                  <div style={{ fontSize:11, color:'#9ca3af', marginTop:5 }}>CDER handles small molecules; CBER handles biologics, vaccines &amp; cellular therapies</div>
-                </div>
-
-              </div>
-
-              <div style={{ marginTop:28, paddingTop:20, borderTop:'1px solid #f3f4f6', display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, flexWrap:'wrap' }}>
-                <p style={{ fontSize:11, color:'#9ca3af', maxWidth:480 }}>
-                  Analysis is for healthcare consulting and advisory purposes only. Not a substitute for legal, regulatory, or actuarial counsel. CMS selection criteria are subject to program evolution.
-                </p>
-                <button type="submit"
-                  style={{ background:'#0f1f42', color:'#fff', padding:'11px 32px', borderRadius:9, fontWeight:700, fontSize:14, border:'none', cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.2)', flexShrink:0 }}
-                  onMouseOver={e=>e.target.style.background='#1a2e5a'}
-                  onMouseOut={e=>e.target.style.background='#0f1f42'}>
-                  Generate Analysis Report →
-                </button>
-              </div>
+      <!-- Visual: Risk tier legend -->
+      <div style="background:#f8fafc;border-radius:14px;border:1px solid #e2e8f0;padding:28px;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:18px;">Risk Score Interpretation</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="background:white;border-radius:9px;padding:14px 16px;border:1px solid #dcfce7;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#15803d;">Low Risk — Score 0–39</div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px;">Near-term selection unlikely. Focus on MTEP readiness planning.</div>
             </div>
-          </form>
-        </div>
-
-        {/* ── REPORT ── */}
-        {report && (
-          <div ref={reportRef} className="fade-up">
-
-            {/* Report sub-header */}
-            <div className="no-print" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16, flexWrap:'wrap' }}>
-              <div>
-                <h2 style={{ fontSize:20, fontWeight:800, color:'#111827', marginBottom:2 }}>
-                  Analysis Report: <span style={{ color:risk.hex }}>{form.drugName || 'Drug Profile'}</span>
-                </h2>
-                <p style={{ fontSize:12, color:'#6b7280' }}>
-                  {form.therapeuticArea} · {form.drugType==='biologic'?'Biologic':'Small Molecule'} · {form.reviewDivision} · Generated {report.at.toLocaleString()}
-                </p>
-              </div>
-              <button onClick={() => window.print()}
-                style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', border:'1px solid #d1d5db', color:'#374151', padding:'9px 18px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', flexShrink:0 }}
-                onMouseOver={e=>e.currentTarget.style.background='#f9fafb'}
-                onMouseOut={e=>e.currentTarget.style.background='#fff'}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
-                </svg>
-                Export PDF
-              </button>
+            <div style="width:36px;height:36px;border-radius:9px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:12px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-
-            {/* Drug info bar */}
-            <div style={{ background:'#0f1f42', borderRadius:10, padding:'14px 20px', marginBottom:20, display:'flex', flexWrap:'wrap', gap:'10px 24px' }}>
-              {[
-                ['Drug',            form.drugName||'—'],
-                ['Area',            form.therapeuticArea],
-                ['Type',            form.drugType==='biologic'?'Biologic':'Small Molecule'],
-                ['FDA Division',    form.reviewDivision],
-                ['Yrs Post-Approval', form.yearsSinceApproval],
-                ['Indications',     form.numIndications],
-                ['Orphan Drug',     form.orphanDrug==='yes'?'Yes':'No'],
-                ['Competition',     form.hasCompetition==='yes'?'Present':'None'],
-              ].map(([k,v]) => (
-                <div key={k} style={{ color:'#fff', fontSize:13 }}>
-                  <span style={{ color:'#93c5fd', marginRight:4 }}>{k}:</span>
-                  <strong>{v}</strong>
-                </div>
-              ))}
-            </div>
-
-            {/* Key metrics */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12, marginBottom:20 }}>
-              <MetricCard label="Risk Score" value={`${report.score.total}/100`} sub={risk.label} valueColor={risk.hex}/>
-              <MetricCard label="MTEP Status"
-                value={report.mtep.eligible?'Eligible':'Pre-Eligible'}
-                sub={report.mtep.eligible?'In negotiation window':`${report.mtep.yearsRemaining} yr(s) remaining`}
-                valueColor={report.mtep.eligible?'#dc2626':'#16a34a'}/>
-              <MetricCard label="Market Exclusivity"
-                value={form.hasCompetition==='no'?'Single-Source':'Competition Present'}
-                sub={form.hasCompetition==='no'?'No alternatives':'Generics/biosimilars'}
-                valueColor={form.hasCompetition==='no'?'#dc2626':'#16a34a'}/>
-              <MetricCard label="Medicare Exposure" value={form.medicareSpend}
-                sub={`${report.payer.spend.level} exposure`} valueColor="#111827"/>
-            </div>
-
-            {/* ── SECTION 1: RISK SCORE ── */}
-            <SectionCard number="1" title="CMS Negotiation Risk Score"
-              sub="Composite eligibility and prioritization assessment across 6 weighted dimensions">
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:32 }}>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', paddingTop:8 }}>
-                  <RiskGauge score={report.score.total}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>Score Breakdown by Factor</div>
-                  {report.score.factors.map((f,i) => <FactorBar key={i} {...f}/>)}
-                </div>
-              </div>
-
-              {/* MTEP Box */}
-              <div style={{ marginTop:24, paddingTop:20, borderTop:'1px solid #f3f4f6' }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12 }}>MTEP Eligibility Assessment</div>
-                <div style={{ borderRadius:10, padding:16, border:`1px solid ${report.mtep.eligible?'#fecaca':'#bbf7d0'}`, background: report.mtep.eligible?'#fef2f2':'#f0fdf4', display:'flex', gap:14, alignItems:'flex-start' }}>
-                  <div style={{ width:34, height:34, borderRadius:999, background: report.mtep.eligible?'#dc2626':'#16a34a', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    {report.mtep.eligible
-                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                      : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    }
-                  </div>
-                  <div>
-                    <div style={{ fontWeight:700, fontSize:14, color: report.mtep.eligible?'#b91c1c':'#15803d', marginBottom:5 }}>
-                      {report.mtep.eligible
-                        ? 'MTEP ELIGIBLE — Subject to CMS Drug Selection'
-                        : 'NOT YET MTEP ELIGIBLE — Pre-Negotiation Window'}
-                    </div>
-                    <div style={{ fontSize:13, color: report.mtep.eligible?'#dc2626':'#16a34a', lineHeight:1.6 }}>
-                      {report.mtep.typeLabel} products become eligible for Maximum Fair Price negotiation {report.mtep.threshold} years after first FDA approval.{' '}
-                      {report.mtep.eligible
-                        ? `${form.drugName||'This product'} has crossed the eligibility threshold and may be selected by CMS in any upcoming cycle.`
-                        : `${form.drugName||'This product'} has approximately ${report.mtep.yearsRemaining} year(s) of protected runway before entering the negotiation window.`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* ── SECTION 2: RECOMMENDATIONS ── */}
-            <SectionCard number="2" title="Market Access Strategy Recommendations"
-              sub="Prioritized strategic actions based on IRA risk profile and product characteristics">
-              <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-                {report.recs.map((rec,i) => (
-                  <div key={i} style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
-                    <PBadge p={rec.p}/>
-                    <p style={{ fontSize:13, color:'#374151', lineHeight:1.7, margin:0 }}>{rec.t}</p>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            {/* ── SECTION 3: PAYER LANDSCAPE ── */}
-            <SectionCard number="3" title="Payer Landscape Analysis"
-              sub="Medicare, Medicaid, and commercial payer exposure assessment">
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:16 }}>
-                {/* Medicare */}
-                <div style={{ background:'#f9fafb', borderRadius:10, padding:18, border:'1px solid #f3f4f6' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em' }}>Medicare Part D</div>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:5,
-                      background: (spendBadge[report.payer.spend.impact]||spendBadge.low).bg,
-                      color:      (spendBadge[report.payer.spend.impact]||spendBadge.low).color }}>
-                      {report.payer.spend.level} Exposure
-                    </span>
-                  </div>
-                  <p style={{ fontSize:12, color:'#6b7280', lineHeight:1.65, margin:0 }}>{report.payer.spend.desc}</p>
-                  <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid #e5e7eb' }}>
-                    <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.06em' }}>Annual Part D Spend</div>
-                    <div style={{ fontSize:20, fontWeight:800, color:'#111827', marginTop:2 }}>{form.medicareSpend}</div>
-                  </div>
-                </div>
-
-                {/* Medicaid */}
-                <div style={{ background:'#f9fafb', borderRadius:10, padding:18, border:'1px solid #f3f4f6' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Medicaid Implications</div>
-                  <p style={{ fontSize:12, color:'#6b7280', lineHeight:1.65, margin:0 }}>{report.payer.medicaidNote}</p>
-                </div>
-
-                {/* Commercial */}
-                <div style={{ background:'#f9fafb', borderRadius:10, padding:18, border:'1px solid #f3f4f6' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Commercial Payer</div>
-                  <p style={{ fontSize:12, color:'#6b7280', lineHeight:1.65, margin:0 }}>{report.payer.commercialNote}</p>
-                  <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid #e5e7eb' }}>
-                    <div style={{ fontSize:10, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.06em' }}>Price Concession Risk</div>
-                    <div style={{ fontSize:13, fontWeight:700, marginTop:3,
-                      color: report.score.total>70?'#dc2626':report.score.total>40?'#d97706':'#16a34a' }}>
-                      {report.score.total>70?'Elevated — Expect Significant Pressure':report.score.total>40?'Moderate — Monitor Closely':'Contained — Manageable Near-Term'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* ── SECTION 4: COMPETITIVE POSITIONING ── */}
-            <SectionCard number="4" title="Competitive Positioning"
-              sub="Generic/biosimilar threat, therapeutic competition, and differentiation strategy">
-              <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#374151' }}>Generic / Biosimilar Threat Assessment</div>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:5,
-                      background: biosimBg[report.comp.biosim.level]||'#fef9c3',
-                      color:      biosimColor[report.comp.biosim.level]||'#a16207' }}>
-                      {report.comp.biosim.level}
-                    </span>
-                  </div>
-                  <p style={{ fontSize:13, color:'#4b5563', lineHeight:1.7, margin:0 }}>{report.comp.biosim.desc}</p>
-                </div>
-
-                <div style={{ paddingTop:16, borderTop:'1px solid #f3f4f6' }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:8 }}>Therapeutic Alternatives Pressure</div>
-                  <p style={{ fontSize:13, color:'#4b5563', lineHeight:1.7, margin:0 }}>{report.comp.taPress}</p>
-                </div>
-
-                <div style={{ paddingTop:16, borderTop:'1px solid #f3f4f6' }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:10 }}>Differentiation Opportunities</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {report.comp.diffOpps.map((item,i) => (
-                      <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" style={{ flexShrink:0, marginTop:2 }}>
-                          <polyline points="9 18 15 12 9 6"/>
-                        </svg>
-                        <span style={{ fontSize:13, color:'#4b5563', lineHeight:1.65 }}>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* Footer */}
-            <div style={{ paddingTop:16, borderTop:'1px solid #e5e7eb', marginTop:8, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8, fontSize:11, color:'#9ca3af', paddingBottom:40 }}>
-              <span>IRA Drug Price Negotiation Analyzer · For healthcare consulting and advisory use only</span>
-              <span>Generated {report.at.toLocaleString()} · Not a substitute for legal or regulatory counsel</span>
-            </div>
-
           </div>
-        )}
+          <div style="background:white;border-radius:9px;padding:14px 16px;border:1px solid #fde68a;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#b45309;">Moderate Risk — Score 40–70</div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px;">Active monitoring required. Begin MFP scenario modeling.</div>
+            </div>
+            <div style="width:36px;height:36px;border-radius:9px;background:#fef9c3;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:12px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+          </div>
+          <div style="background:white;border-radius:9px;padding:14px 16px;border:1px solid #fecaca;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#b91c1c;">High Risk — Score 71–100</div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px;">Immediate negotiation preparation protocol. Engage counsel now.</div>
+            </div>
+            <div style="width:36px;height:36px;border-radius:9px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:12px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  );
-}
+  </div>
+</section>
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-</script>
+<!-- ── FOOTER ── -->
+<footer style="background:#070f22;padding:40px 24px;font-family:Inter,system-ui;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:24px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid #1e3a6e;">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">
+          <div style="width:28px;height:28px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <span style="color:white;font-weight:800;font-size:15px;">MarketAccess.ai</span>
+        </div>
+        <p style="color:#475569;font-size:12px;max-width:340px;line-height:1.7;">IRA strategy tools for healthcare market access professionals. Built for consultants at firms including Avalere Health, ZS Associates, IQVIA, and Precision AQ.</p>
+      </div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap;">
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Tools</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <a href="analyzer.html"       style="color:#64748b;font-size:13px;text-decoration:none;" onmouseover="this.style.color='#93c5fd'" onmouseout="this.style.color='#64748b'">Risk Analyzer</a>
+            <a href="cms-simulator.html"  style="color:#64748b;font-size:13px;text-decoration:none;" onmouseover="this.style.color='#93c5fd'" onmouseout="this.style.color='#64748b'">CMS Simulator</a>
+            <span style="color:#374151;font-size:13px;">HEOR Dossier <span style="font-size:10px;background:#1e3a6e;color:#4b6cb7;padding:1px 5px;border-radius:3px;margin-left:2px;">Soon</span></span>
+          </div>
+        </div>
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Reference</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <span style="color:#64748b;font-size:13px;">IRA § 1191–1198</span>
+            <span style="color:#64748b;font-size:13px;">CMS MFP Guidance</span>
+            <span style="color:#64748b;font-size:13px;">AMCP Dossier Format</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <p style="color:#334155;font-size:11px;margin:0;">© 2026 MarketAccess.ai — IRA Strategy Suite. For healthcare consulting and advisory use only.</p>
+      <p style="color:#334155;font-size:11px;margin:0;">Not a substitute for legal, regulatory, or actuarial counsel. CMS selection criteria subject to program evolution.</p>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>
