@@ -2,7 +2,7 @@
 
 A healthcare consulting analytics platform for navigating CMS drug price negotiation under the Inflation Reduction Act. Built as a portfolio piece targeting market access roles at firms like Avalere Health, ZS Associates, and IQVIA.
 
-**Live site:** https://rimjhimsingh20.github.io/IRA-pricing-analyzer/
+**Live site:** https://iraanalyzer.netlify.app/
 
 ---
 
